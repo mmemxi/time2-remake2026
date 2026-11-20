@@ -710,7 +710,7 @@
       {number:5, title:"通り過ぎた日々", position:10}
     ];
     const bgmPlayer = new Audio();
-    const voicePlayer = new Audio();
+    let voicePlayer = new Audio();
     const musicModePlayer = new Audio();
     const loopingScenarioSoundPlayer = new Audio();
     const activeScenarioSoundPlayers = new Set();
@@ -731,6 +731,7 @@
     let soundEffectCacheSerial = 0;
     let voiceRequestToken = 0;
     let voiceLoading = false;
+    let voicePlaybackActive = false;
     let voiceQueue = [];
     let audioUnlocked = false;
     let audioPlaybackAllowed = false;
@@ -2556,19 +2557,25 @@
     async function unlockAudio() {
       if (audioUnlocked) return true;
       const silentWav = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
-      const oldVolume = bgmPlayer.volume;
-      bgmPlayer.volume = 0;
-      bgmPlayer.src = silentWav;
+      const players = [bgmPlayer, voicePlayer];
+      const oldVolumes = players.map((player) => player.volume);
+      players.forEach((player) => {
+        player.volume = 0;
+        player.src = silentWav;
+      });
       try {
-        await bgmPlayer.play();
-        bgmPlayer.pause();
-        bgmPlayer.currentTime = 0;
+        await Promise.all(players.map((player) => player.play()));
         audioUnlocked = true;
       } catch (error) {
         audioUnlocked = false;
       }
+      players.forEach((player, index) => {
+        try { player.pause(); } catch (error) {}
+        player.removeAttribute("src");
+        try { player.load(); } catch (error) {}
+        player.volume = oldVolumes[index];
+      });
       document.documentElement.dataset.audioUnlocked = String(audioUnlocked);
-      bgmPlayer.volume = oldVolume;
       return audioUnlocked;
     }
 
@@ -2860,7 +2867,7 @@
     }
 
     async function processVoiceQueue() {
-      if (voiceLoading || !voicePlayer.paused || !voiceQueue.length || isSkipping()) return;
+      if (voiceLoading || voicePlaybackActive || !voiceQueue.length || isSkipping()) return;
       voiceLoading = true;
       const voiceName = voiceQueue.shift();
       const requestToken = voiceRequestToken;
@@ -2874,23 +2881,45 @@
           processVoiceQueue();
           return;
         }
+        voicePlayer.pause();
+        voicePlayer.removeAttribute("src");
+        voicePlayer.load();
         voicePlayer.src = voiceUrl;
         voicePlayer.volume = voiceMute.checked ? 0 : Number(voiceVolume.value) / 10;
-        voiceLoading = false;
         await voicePlayer.play();
-      } catch (error) {
+        if (requestToken !== voiceRequestToken) return;
         voiceLoading = false;
-        processVoiceQueue();
+        voicePlaybackActive = true;
+      } catch (error) {
+        recoverVoicePlayer(requestToken);
       }
+    }
+
+    function recoverVoicePlayer(requestToken = voiceRequestToken) {
+      if (requestToken !== voiceRequestToken) return;
+      voiceRequestToken += 1;
+      voiceLoading = false;
+      voicePlaybackActive = false;
+      const failedPlayer = voicePlayer;
+      try { failedPlayer.pause(); } catch (error) {}
+      failedPlayer.removeAttribute("src");
+      try { failedPlayer.load(); } catch (error) {}
+      // A media element can remain internally poisoned after a decode/network
+      // error. Replace it so one bad MP3 can never block every later voice.
+      voicePlayer = new Audio();
+      voicePlayer.volume = voiceMute.checked ? 0 : Number(voiceVolume.value) / 10;
+      bindVoicePlayerEvents(voicePlayer);
+      processVoiceQueue();
     }
 
     function stopVoice() {
       voiceRequestToken += 1;
       voiceLoading = false;
+      voicePlaybackActive = false;
       voiceQueue = [];
-      voicePlayer.pause();
+      try { voicePlayer.pause(); } catch (error) {}
       voicePlayer.removeAttribute("src");
-      voicePlayer.load();
+      try { voicePlayer.load(); } catch (error) {}
     }
 
     function replayVoice(voiceName) {
@@ -2903,11 +2932,19 @@
       return controlSkipActive || buttonSkipActive;
     }
 
-    voicePlayer.addEventListener("ended", () => {
-      voicePlayer.removeAttribute("src");
-      voicePlayer.load();
-      processVoiceQueue();
-    });
+    function bindVoicePlayerEvents(player) {
+      player.addEventListener("ended", () => {
+        if (player !== voicePlayer) return;
+        voicePlaybackActive = false;
+        player.removeAttribute("src");
+        player.load();
+        processVoiceQueue();
+      });
+      player.addEventListener("error", () => {
+        if (player === voicePlayer) recoverVoicePlayer();
+      });
+    }
+    bindVoicePlayerEvents(voicePlayer);
 
     function currentMusicVolume() {
       return musicMute.checked ? 0 : Number(musicVolume.value) / 10;
