@@ -307,6 +307,7 @@
     .item-entry::before { content: "◆"; flex: none; color: #79d9ee; font-size: 12px; }
     .item-empty { margin: auto; color: #8398a5; text-align: center; font-size: 17px; line-height: 1.7; }
     .settings-body { display: grid; gap: 26px; padding: 25px 28px 29px; overflow-y: auto; }
+    .settings-version { margin: -8px 0 0; color: #718894; font-size: 12px; letter-spacing: .08em; text-align: center; }
     .settings-dialog.replay-only .setting-row { display: none; }
     .setting-row { display: grid; gap: 11px; }
     .setting-label { color: #dce9f0; font-size: 14px; font-weight: 700; letter-spacing: .08em; }
@@ -544,6 +545,7 @@
           </div>
         </div>
         <button type="button" class="return-title-button" id="returnTitleButton">タイトルに戻る</button>
+        <p class="settings-version" aria-label="ゲームのバージョン">Version 1.0.1</p>
       </section>
     </div>
   </dialog>
@@ -751,9 +753,14 @@
     let pendingGraphicsRequest = null;
     let currentResolvedLayers = {jpg: [], gif: []};
     const assetExistenceCache = new Map();
+    const expressionShuffleGroupCache = new Map();
+    let shuffleMusicFilesPromise = null;
     window.sceneAssetVersion = Date.now().toString(36);
     window.gameMode = localStorage.getItem("Time2:GameMode") === "original" ? "original" : "remake";
+    let currentResolvedGameMode = window.gameMode;
     window.nekomimiMode = false;
+    window.expressionShuffleMode = false;
+    window.musicShuffleMode = false;
     window.imageEffectsEnabled = localStorage.getItem("Time2:ImageEffects") !== "false";
     window.skipUnreadMessages = localStorage.getItem("Time2:SkipUnread") === "true";
     window.fontSizeLevel = Math.max(1, Math.min(5, Number(localStorage.getItem("Time2:FontSize")) || 3));
@@ -922,6 +929,18 @@
           event.preventDefault();
           toggleSelectedMusicPlayback();
         }
+        return;
+      }
+      const titleShuffleKey = String(event.key || "").toLowerCase();
+      const titleShuffleAvailable = !startScreen.classList.contains("hidden")
+        && hiddenImageViewer.hidden && hasAnyEndingAchievement()
+        && !uiConfirmDialog.open && !settingsDialog.open && !saveDialog.open
+        && !event.ctrlKey && !event.altKey && !event.metaKey;
+      if (titleShuffleAvailable && !event.repeat && (titleShuffleKey === "q" || titleShuffleKey === "w")) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (titleShuffleKey === "q") toggleExpressionShuffleMode();
+        else toggleMusicShuffleMode();
         return;
       }
       if (uiConfirmDialog.open) {
@@ -1314,6 +1333,26 @@
       void showUiDialog({
         title:"ねこみみモード",
         message:`ねこみみモードを${window.nekomimiMode ? "ON" : "OFF"}にしました。`,
+        confirmText:"OK",
+        alertOnly:true
+      });
+    }
+
+    function toggleExpressionShuffleMode() {
+      window.expressionShuffleMode = !window.expressionShuffleMode;
+      void showUiDialog({
+        title:"表情シャッフルモード",
+        message:`表情シャッフルモードを${window.expressionShuffleMode ? "ON" : "OFF"}にしました。`,
+        confirmText:"OK",
+        alertOnly:true
+      });
+    }
+
+    function toggleMusicShuffleMode() {
+      window.musicShuffleMode = !window.musicShuffleMode;
+      void showUiDialog({
+        title:"音楽シャッフルモード",
+        message:`音楽シャッフルモードを${window.musicShuffleMode ? "ON" : "OFF"}にしました。`,
         confirmText:"OK",
         alertOnly:true
       });
@@ -2435,15 +2474,21 @@
         const slot = Number(layer.dataset.layerSlot) || 0;
         const image = layer.querySelector("img");
         if (!image || !nextLayers[kind]) return;
-        const originalSource = image.dataset.originalSource;
-        const remakeSource = image.dataset.remakeSource;
-        let resolvedSource = "";
-        if (targetMode === "remake") {
+        let originalSource = image.dataset.originalSource;
+        let remakeSource = image.dataset.remakeSource;
+        const retainedShuffledSource = kind === "gif" && window.expressionShuffleMode
+          ? retainedShuffledCharacterSource(slot, originalSource, remakeSource, targetMode)
+          : "";
+        if (kind === "gif" && window.expressionShuffleMode && !retainedShuffledSource) {
+          ({originalSource, remakeSource} = await shuffledCharacterSources(originalSource, remakeSource, targetMode));
+        }
+        let resolvedSource = retainedShuffledSource;
+        if (!resolvedSource && targetMode === "remake") {
           const nekomimiSource = window.nekomimiMode ? nekomimiAssetSource(remakeSource, kind) : "";
           if (nekomimiSource && await sceneAssetExists(nekomimiSource)) resolvedSource = nekomimiSource;
           else if (await sceneAssetExists(remakeSource)) resolvedSource = remakeSource;
           else if (await sceneAssetExists(originalSource)) resolvedSource = originalSource;
-        } else if (await sceneAssetExists(originalSource)) {
+        } else if (!resolvedSource && await sceneAssetExists(originalSource)) {
           resolvedSource = originalSource;
         }
         if (resolvedSource) {
@@ -2464,7 +2509,7 @@
           layer.remove();
         }
       }));
-      return {fragment: documentFragment.body.outerHTML, layers: nextLayers};
+      return {fragment: documentFragment.body.outerHTML, layers: nextLayers, gameMode:targetMode};
     }
 
     function nekomimiAssetSource(remakeSource, kind) {
@@ -2472,6 +2517,57 @@
       return kind === "gif"
         ? remakeSource.replace("/remake/gif/", "/remake/ngif/")
         : remakeSource.replace("/remake/jpg/", "/remake/njpg/");
+    }
+
+    function numberedCharacterSource(source) {
+      const match = String(source || "").match(/^(.*?)(\d+)(\.[^./?#]+)$/);
+      if (!match) return null;
+      return {prefix:match[1], number:Number(match[2]), width:match[2].length, extension:match[3]};
+    }
+
+    function characterSourceAt(parts, number) {
+      if (!parts) return "";
+      return `${parts.prefix}${String(number).padStart(parts.width, "0")}${parts.extension}`;
+    }
+
+    function retainedShuffledCharacterSource(slot, originalSource, remakeSource, targetMode) {
+      if (currentResolvedGameMode !== targetMode) return "";
+      const retainedLayer = currentResolvedLayers.gif?.[slot];
+      if (!retainedLayer) return "";
+      const holder = document.createElement("div");
+      holder.innerHTML = retainedLayer;
+      const retainedImage = holder.querySelector("img");
+      if (!retainedImage
+        || retainedImage.dataset.originalSource !== originalSource
+        || retainedImage.dataset.remakeSource !== remakeSource) return "";
+      return retainedImage.getAttribute("src") || "";
+    }
+
+    async function shuffledCharacterSources(originalSource, remakeSource, targetMode) {
+      const originalParts = numberedCharacterSource(originalSource);
+      const remakeParts = numberedCharacterSource(remakeSource);
+      const template = targetMode === "remake" ? (remakeParts || originalParts) : originalParts;
+      if (!template) return {originalSource, remakeSource};
+      const groupKey = [targetMode, originalParts?.prefix, originalParts?.extension, remakeParts?.prefix, remakeParts?.extension].join("|");
+      let candidatesPromise = expressionShuffleGroupCache.get(groupKey);
+      if (!candidatesPromise) {
+        candidatesPromise = Promise.all(Array.from({length:21}, async (_, number) => {
+          const originalCandidate = characterSourceAt(originalParts, number);
+          const remakeCandidate = characterSourceAt(remakeParts, number);
+          const exists = targetMode === "remake"
+            ? (await sceneAssetExists(remakeCandidate) || await sceneAssetExists(originalCandidate))
+            : await sceneAssetExists(originalCandidate);
+          return exists ? number : null;
+        })).then((numbers) => numbers.filter((number) => number !== null));
+        expressionShuffleGroupCache.set(groupKey, candidatesPromise);
+      }
+      const candidates = await candidatesPromise;
+      if (candidates.length < 2) return {originalSource, remakeSource};
+      const selectedNumber = candidates[Math.floor(Math.random() * candidates.length)];
+      return {
+        originalSource: characterSourceAt(originalParts, selectedNumber) || originalSource,
+        remakeSource: characterSourceAt(remakeParts, selectedNumber) || remakeSource
+      };
     }
 
     async function sceneAssetExists(source) {
@@ -2498,6 +2594,7 @@
       const resolvedGraphics = await resolveGraphicsFragment(fragment);
       const nextHtml = graphicsDocument(resolvedGraphics.fragment);
       if (nextHtml === currentGraphicsHtml) {
+        currentResolvedGameMode = resolvedGraphics.gameMode;
         graphicsTransitionBusy = false;
         if (pendingGraphicsRequest) {
           const pending = pendingGraphicsRequest;
@@ -2542,6 +2639,7 @@
       function finishGraphicsTransition() {
         currentGraphicsHtml = nextHtml;
         currentResolvedLayers = resolvedGraphics.layers;
+        currentResolvedGameMode = resolvedGraphics.gameMode;
         activeGraphicsFrameId = incomingFrameId;
         outgoingFrame.style.opacity = "0";
         incomingFrame.style.zIndex = "1";
@@ -2557,24 +2655,19 @@
     async function unlockAudio() {
       if (audioUnlocked) return true;
       const silentWav = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
-      const players = [bgmPlayer, voicePlayer];
-      const oldVolumes = players.map((player) => player.volume);
-      players.forEach((player) => {
-        player.volume = 0;
-        player.src = silentWav;
-      });
+      // Do not use a live BGM/voice element for the unlock probe. Clearing that
+      // element afterwards can dispatch a delayed media error and poison the
+      // next real playback.
+      const unlockProbe = new Audio(silentWav);
+      unlockProbe.volume = 0;
       try {
-        await Promise.all(players.map((player) => player.play()));
+        await unlockProbe.play();
         audioUnlocked = true;
       } catch (error) {
         audioUnlocked = false;
       }
-      players.forEach((player, index) => {
-        try { player.pause(); } catch (error) {}
-        player.removeAttribute("src");
-        try { player.load(); } catch (error) {}
-        player.volume = oldVolumes[index];
-      });
+      try { unlockProbe.pause(); } catch (error) {}
+      unlockProbe.removeAttribute("src");
       document.documentElement.dataset.audioUnlocked = String(audioUnlocked);
       return audioUnlocked;
     }
@@ -2743,9 +2836,11 @@
       const switchToken = ++bgmSwitchToken;
       requestedBgm = request || "";
       if (!requestedBgm) { stopBgm(); return; }
-      const resolved = requestedBgm.startsWith("modebgm|")
-        ? await resolveModeBgm(requestedBgm)
-        : await resolveSingleBgm(requestedBgm);
+      const resolved = shouldShuffleGameBgm()
+        ? await resolveShuffledBgm(requestedBgm)
+        : requestedBgm.startsWith("modebgm|")
+          ? await resolveModeBgm(requestedBgm)
+          : await resolveSingleBgm(requestedBgm);
       if (switchToken !== bgmSwitchToken || requestedBgm !== request) return false;
       if (!resolved) {
         markBgmStopped();
@@ -2834,6 +2929,50 @@
       return {playOnce, source: await assetExists(mp3Url) ? mp3Url : midiUrl, midiUrl};
     }
 
+    function shouldShuffleGameBgm() {
+      return window.musicShuffleMode
+        && startScreen.classList.contains("hidden")
+        && !galleryActive && !musicModeActive && !characterModeActive
+        && !window.bonusMode && !window.endingReplayMode;
+    }
+
+    function bgmRequestPlaysOnce(request) {
+      if (String(request || "").startsWith("@")) return true;
+      if (!String(request || "").startsWith("modebgm|")) return false;
+      const fields = request.split("|");
+      return fields.length === 4 && decodeURIComponent(fields[1]) === "1";
+    }
+
+    async function loadShuffleMusicFiles() {
+      if (shuffleMusicFilesPromise) return shuffleMusicFilesPromise;
+      shuffleMusicFilesPromise = fetch("scenario/music.txt", {cache:"no-store"})
+        .then((response) => {
+          if (!response.ok) throw new Error(`music.txt: HTTP ${response.status}`);
+          return response.text();
+        })
+        .then((text) => Array.from(new Set(text.replace(/^\uFEFF/, "").split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line && !line.startsWith("#"))
+          .map((line) => line.split("\t")[0]?.trim())
+          .filter((file) => file && /\.mp3$/i.test(file)))))
+        .catch((error) => {
+          console.warn("音楽シャッフル用の曲一覧を読み込めませんでした", error);
+          shuffleMusicFilesPromise = null;
+          return [];
+        });
+      return shuffleMusicFilesPromise;
+    }
+
+    async function resolveShuffledBgm(request) {
+      const files = await loadShuffleMusicFiles();
+      if (!files.length) {
+        return request.startsWith("modebgm|") ? resolveModeBgm(request) : resolveSingleBgm(request);
+      }
+      const file = files[Math.floor(Math.random() * files.length)];
+      const source = new URL(`mp3/${file.split("/").pop()}`, location.href).href;
+      return {playOnce:bgmRequestPlaysOnce(request), source, midiUrl:source};
+    }
+
     async function resolveModeBgm(request) {
       const fields = request.split("|");
       if (fields.length !== 4) return null;
@@ -2862,45 +3001,54 @@
 
     function playVoice(voiceName) {
       if (!audioPlaybackAllowed || !voiceName || isSkipping()) return;
-      voiceQueue.push(voiceName);
+      voiceQueue = [voiceName];
       processVoiceQueue();
     }
 
     async function processVoiceQueue() {
-      if (voiceLoading || voicePlaybackActive || !voiceQueue.length || isSkipping()) return;
+      if (!voiceQueue.length || isSkipping()) return;
+      // A newly displayed line always supersedes the previous voice. This also
+      // means a stale "playing" flag can never block every later line.
+      const voiceName = voiceQueue.pop();
+      voiceQueue = [];
+      const requestToken = ++voiceRequestToken;
       voiceLoading = true;
-      const voiceName = voiceQueue.shift();
-      const requestToken = voiceRequestToken;
+      voicePlaybackActive = false;
+      const previousPlayer = voicePlayer;
+      try { previousPlayer.pause(); } catch (error) {}
+
+      const player = new Audio();
+      voicePlayer = player;
+      player.preload = "auto";
+      player.volume = voiceMute.checked ? 0 : Number(voiceVolume.value) / 10;
+      bindVoicePlayerEvents(player, requestToken);
       const voiceUrlObject = new URL(`voice/${encodeURIComponent(voiceName)}.mp3`, location.href);
       voiceUrlObject.searchParams.set("voice-cache", `${voiceCacheSession}-${++voiceCacheSerial}`);
-      const voiceUrl = voiceUrlObject.href;
+      player.src = voiceUrlObject.href;
       try {
-        const response = await fetch(voiceUrl, { method: "HEAD", cache: "no-store" });
-        if (!response.ok || requestToken !== voiceRequestToken || isSkipping()) {
-          voiceLoading = false;
-          processVoiceQueue();
+        // Start playback without a preliminary HEAD request. In stricter
+        // browsers that request can consume the click activation before play().
+        await player.play();
+        if (requestToken !== voiceRequestToken || player !== voicePlayer) {
+          try { player.pause(); } catch (error) {}
           return;
         }
-        voicePlayer.pause();
-        voicePlayer.removeAttribute("src");
-        voicePlayer.load();
-        voicePlayer.src = voiceUrl;
-        voicePlayer.volume = voiceMute.checked ? 0 : Number(voiceVolume.value) / 10;
-        await voicePlayer.play();
-        if (requestToken !== voiceRequestToken) return;
         voiceLoading = false;
         voicePlaybackActive = true;
       } catch (error) {
-        recoverVoicePlayer(requestToken);
+        if (error?.name === "NotAllowedError") {
+          audioUnlocked = false;
+          document.documentElement.dataset.audioUnlocked = "false";
+        }
+        recoverVoicePlayer(requestToken, player);
       }
     }
 
-    function recoverVoicePlayer(requestToken = voiceRequestToken) {
-      if (requestToken !== voiceRequestToken) return;
+    function recoverVoicePlayer(requestToken = voiceRequestToken, failedPlayer = voicePlayer) {
+      if (requestToken !== voiceRequestToken || failedPlayer !== voicePlayer) return;
       voiceRequestToken += 1;
       voiceLoading = false;
       voicePlaybackActive = false;
-      const failedPlayer = voicePlayer;
       try { failedPlayer.pause(); } catch (error) {}
       failedPlayer.removeAttribute("src");
       try { failedPlayer.load(); } catch (error) {}
@@ -2909,7 +3057,7 @@
       voicePlayer = new Audio();
       voicePlayer.volume = voiceMute.checked ? 0 : Number(voiceVolume.value) / 10;
       bindVoicePlayerEvents(voicePlayer);
-      processVoiceQueue();
+      if (voiceQueue.length) processVoiceQueue();
     }
 
     function stopVoice() {
@@ -2932,16 +3080,22 @@
       return controlSkipActive || buttonSkipActive;
     }
 
-    function bindVoicePlayerEvents(player) {
+    function bindVoicePlayerEvents(player, requestToken = voiceRequestToken) {
       player.addEventListener("ended", () => {
-        if (player !== voicePlayer) return;
+        if (player !== voicePlayer || requestToken !== voiceRequestToken) return;
+        voiceLoading = false;
         voicePlaybackActive = false;
         player.removeAttribute("src");
         player.load();
         processVoiceQueue();
       });
       player.addEventListener("error", () => {
-        if (player === voicePlayer) recoverVoicePlayer();
+        recoverVoicePlayer(requestToken, player);
+      });
+      player.addEventListener("abort", () => {
+        if (player !== voicePlayer || requestToken !== voiceRequestToken) return;
+        voiceLoading = false;
+        voicePlaybackActive = false;
       });
     }
     bindVoicePlayerEvents(voicePlayer);
