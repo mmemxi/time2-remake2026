@@ -32,7 +32,7 @@ function clrtxt() { tcnt=0;scnt=0;gameOverPending=false;endingPending=null;scree
 function appUrl(file)
 	{
 	var url=new URL("html/"+file,top.location.href);
-	url.searchParams.set("v","20261119-shake-terminal2");
+	url.searchParams.set("v","20261120-historywrap1");
 	return url.href;
 	}
 
@@ -59,15 +59,15 @@ function layer(str,x,y,xs,ys)
 
 // =====テキスト関連======================================================
 
-function put(str)
+function put(str,readSource)
 	{
 	tcnt++;
-	ltxt[tcnt] = {type:"text",html:str};
+	ltxt[tcnt] = {type:"text",html:str,readHtml:readSource==null?str:String(readSource)};
 	}
-function putDialogue(speaker,body,voice)
+function putDialogue(speaker,body,voice,readSpeaker,readBody)
 	{
 	tcnt++;
-	ltxt[tcnt] = {type:"dialogue",speaker:String(speaker),body:String(body),voice:String(voice||"")};
+	ltxt[tcnt] = {type:"dialogue",speaker:String(speaker),body:String(body),voice:String(voice||""),readSpeaker:readSpeaker==null?String(speaker):String(readSpeaker),readBody:readBody==null?String(body):String(readBody)};
 	}
 function sel(prompt,jumpto,page)
 	{
@@ -82,34 +82,39 @@ var choices="";
 var action;
 currentTextUnits=[];
 var normalHtml="";
+var normalReadHtml="";
 var normalPresentationStage=null;
 var normalFadeAfter=null;
 function flushNormalUnit()
 	{
-	if(!plainStoryText(normalHtml)){normalHtml="";return;}
+	if(!plainStoryText(normalHtml)){normalHtml="";normalReadHtml="";return;}
 	var unitIndex=currentTextUnits.length;
 	var text=plainStoryText(normalHtml);
-	currentTextUnits.push({type:"text",html:normalHtml,text:text,key:makeMessageKey(text,unitIndex),presentationStage:normalPresentationStage,fadeAfter:normalFadeAfter});
+	var readText=plainStoryText(normalReadHtml||normalHtml);
+	currentTextUnits.push({type:"text",html:normalHtml,text:text,key:makeMessageKey(readText,unitIndex),presentationStage:normalPresentationStage,fadeAfter:normalFadeAfter});
 	normalHtml="";
+	normalReadHtml="";
 	normalPresentationStage=null;
 	normalFadeAfter=null;
 	}
 for (i=1;i<=tcnt;i++)
 	{
 	var entry=ltxt[i];
-	if(typeof entry==="string") normalHtml+=entry;
+	if(typeof entry==="string") {normalHtml+=entry;normalReadHtml+=entry;}
 	else if(entry&&entry.type==="dialogue")
 		{
 		flushNormalUnit();
 		var dialogueText=entry.speaker+"「"+plainStoryText(entry.body)+"」";
+		var dialogueReadText=(entry.readSpeaker==null?entry.speaker:entry.readSpeaker)+"「"+plainStoryText(entry.readBody==null?entry.body:entry.readBody)+"」";
 		var dialogueIndex=currentTextUnits.length;
-		currentTextUnits.push({type:"dialogue",speaker:entry.speaker,body:plainStoryText(entry.body),voice:entry.voice,text:dialogueText,key:makeMessageKey(dialogueText,dialogueIndex),presentationStage:entry.presentationStage||null,fadeAfter:entry.fadeAfter||null});
+		currentTextUnits.push({type:"dialogue",speaker:entry.speaker,body:plainStoryText(entry.body),voice:entry.voice,text:dialogueText,key:makeMessageKey(dialogueReadText,dialogueIndex),presentationStage:entry.presentationStage||null,fadeAfter:entry.fadeAfter||null});
 		}
 	else if(entry)
 		{
 		if(normalHtml&&normalPresentationStage&&entry.presentationStage&&normalPresentationStage.revision!==entry.presentationStage.revision) flushNormalUnit();
 		if(!normalHtml) normalPresentationStage=entry.presentationStage||null;
 		normalHtml+=entry.html||"";
+		normalReadHtml+=entry.readHtml==null?(entry.html||""):entry.readHtml;
 		if(entry.fadeAfter){normalFadeAfter=entry.fadeAfter;flushNormalUnit();}
 		}
 	}
@@ -162,15 +167,30 @@ function resetMessageHistory()
 	messageHistory=[];lastHistorySignature="";
 	if(top.closeHistory) top.closeHistory();
 	}
-function recordMessageHistory(unit)
+function recordMessageHistory(unit,pageIndex,text,speaker)
 	{
 	if(!unit) return;
-	var text=unit.text||plainStoryText(unit.html||"");
-	text=text.replace(/\uE000/g,"\n");
-	if(!text) return;
-	var signature=unit.key||page+":"+line+":"+text;
-	if(signature==lastHistorySignature) return;
-	messageHistory.push({type:"message",text:text,key:unit.key||currentMessageKey,voice:unit.type==="dialogue"?(unit.voice||""):""});
+	if(typeof text!=="string")
+		{
+		pageIndex=Number.isFinite(pageIndex)?pageIndex:0;
+		if(unit.type==="dialogue")
+			{
+			text=plainStoryText(unit.body||"");
+			speaker=unit.speaker||"";
+			}
+		else
+			{
+			text=unit.text||plainStoryText(unit.html||"");
+			speaker="";
+			}
+		}
+	text=String(text||"").replace(/\uE000/g,"\n");
+	if(!text.trim()) return;
+	speaker=String(speaker||"");
+	var key=unit.key||currentMessageKey;
+	var signature=JSON.stringify([key||[page,line],pageIndex,text,speaker]);
+	if(signature===lastHistorySignature) return;
+	messageHistory.push({type:"message",text:text,key:key,speaker:speaker,voice:unit.type==="dialogue"?(unit.voice||""):""});
 	lastHistorySignature=signature;
 	}
 function recordChoiceHistory(index)

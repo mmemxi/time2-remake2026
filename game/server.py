@@ -3,7 +3,8 @@
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock, Timer
-from urllib.parse import urlparse
+from time import monotonic
+from urllib.parse import parse_qs, urlparse
 import argparse
 import json
 import re
@@ -11,6 +12,7 @@ import webbrowser
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
+INSTALL_METADATA_FILE = PROJECT_DIR.parent / "installed.json"
 SAVE_FILE = PROJECT_DIR / "save-data.json"
 PORT_FILE = PROJECT_DIR / ".time2-port"
 PREFERRED_PORT = 8127
@@ -19,23 +21,43 @@ LIFECYCLE_LOCK = Lock()
 LIFECYCLE_TIMER = None
 LIFECYCLE_GENERATION = 0
 AUTO_STOPPED = False
+ACTIVE_CLIENTS = {}
+ACTIVE_CLIENT_TIMEOUT = 30.0
 LEGACY_ITEM_FLAG_NUMBERS = (2, 3, 5, 10, 42, 64, 65, 66, 67, 68, 74, 75, 76, 80, 81, 82, 83, 84, 85, 90)
 
 
-def cancel_pending_shutdown() -> None:
+def prune_inactive_clients() -> None:
+    cutoff = monotonic() - ACTIVE_CLIENT_TIMEOUT
+    for client_id, (_, last_seen) in list(ACTIVE_CLIENTS.items()):
+        if last_seen < cutoff:
+            ACTIVE_CLIENTS.pop(client_id, None)
+
+
+def cancel_pending_shutdown(client_id=None, document_id=None) -> None:
     """Keep the server alive when a game tab is active (including after reload)."""
     global LIFECYCLE_TIMER, LIFECYCLE_GENERATION
     with LIFECYCLE_LOCK:
+        prune_inactive_clients()
+        if client_id and document_id:
+            ACTIVE_CLIENTS[client_id] = (document_id, monotonic())
         LIFECYCLE_GENERATION += 1
         if LIFECYCLE_TIMER is not None:
             LIFECYCLE_TIMER.cancel()
             LIFECYCLE_TIMER = None
 
 
-def schedule_shutdown(server: ThreadingHTTPServer) -> None:
+def schedule_shutdown(server: ThreadingHTTPServer, client_id=None, document_id=None) -> None:
     """Stop shortly after the game tab closes, unless another tab reports activity."""
     global LIFECYCLE_TIMER, LIFECYCLE_GENERATION, AUTO_STOPPED
     with LIFECYCLE_LOCK:
+        prune_inactive_clients()
+        if client_id and document_id:
+            active = ACTIVE_CLIENTS.get(client_id)
+            if active and active[0] != document_id:
+                return
+            ACTIVE_CLIENTS.pop(client_id, None)
+            if ACTIVE_CLIENTS:
+                return
         LIFECYCLE_GENERATION += 1
         generation = LIFECYCLE_GENERATION
         if LIFECYCLE_TIMER is not None:
@@ -45,6 +67,10 @@ def schedule_shutdown(server: ThreadingHTTPServer) -> None:
             global LIFECYCLE_TIMER, AUTO_STOPPED
             with LIFECYCLE_LOCK:
                 if generation != LIFECYCLE_GENERATION:
+                    return
+                prune_inactive_clients()
+                if ACTIVE_CLIENTS:
+                    LIFECYCLE_TIMER = None
                     return
                 LIFECYCLE_TIMER = None
                 AUTO_STOPPED = True
@@ -126,6 +152,18 @@ def write_install_port(port: int) -> None:
         pass
 
 
+def read_game_version() -> str:
+    """Read installer metadata without exposing files above the game root."""
+    try:
+        metadata = json.loads(INSTALL_METADATA_FILE.read_text(encoding="utf-8-sig"))
+        version = metadata.get("version") if isinstance(metadata, dict) else None
+        if isinstance(version, str) and version.strip():
+            return version.strip()
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        pass
+    return "for development"
+
+
 class Time2Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(PROJECT_DIR), **kwargs)
@@ -152,20 +190,32 @@ class Time2Handler(SimpleHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_GET(self):
-        if urlparse(self.path).path == "/api/saves":
+        request_path = urlparse(self.path).path
+        if request_path == "/api/version":
+            self.send_json({"version": read_game_version()})
+            return
+        if request_path == "/api/saves":
             with SAVE_LOCK:
                 self.send_json(read_saves())
             return
         super().do_GET()
 
     def do_POST(self):
-        request_path = urlparse(self.path).path
+        parsed_request = urlparse(self.path)
+        request_path = parsed_request.path
+        parameters = parse_qs(parsed_request.query)
+        client_id = parameters.get("client", [None])[0]
+        document_id = parameters.get("document", [None])[0]
+        if client_id and len(client_id) > 100:
+            client_id = None
+        if document_id and len(document_id) > 100:
+            document_id = None
         if request_path == "/api/lifecycle/ping":
-            cancel_pending_shutdown()
+            cancel_pending_shutdown(client_id, document_id)
             self.send_json({"ok": True})
             return
         if request_path == "/api/lifecycle/close":
-            schedule_shutdown(self.server)
+            schedule_shutdown(self.server, client_id, document_id)
             self.send_json({"ok": True})
             return
         match = re.fullmatch(r"/api/saves/(\d+)", request_path)

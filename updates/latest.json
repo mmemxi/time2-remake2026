@@ -1,5 +1,5 @@
 {
-    "version":  "1.0.2",
+    "version":  "1.0.3",
     "files":  [
                   {
                       "path":  "character/makio.png",
@@ -48,18 +48,18 @@
                   },
                   {
                       "path":  "html/scenario-runner.html",
-                      "sha256":  "51e87eb988e38f5afdb8e76b977fa76df943d38c7ab6658c95d0ea3385b7cbfb",
-                      "size":  210
+                      "sha256":  "fee5610cbaaf915ac854822fff465a21f2769a07633dddccc14952588d1233e8",
+                      "size":  207
                   },
                   {
                       "path":  "html/sys.html",
-                      "sha256":  "dc314b9c54fdfdfdc7e3611b60b3af7ce7ce128d428cc253576f3612b8b4d2d2",
-                      "size":  12891
+                      "sha256":  "9c0d089cce198aad98639e49bd4c62ae054134794432f8c2200ffc9cce47e0e2",
+                      "size":  14046
                   },
                   {
                       "path":  "html/text.html",
-                      "sha256":  "6b30253b72fc7efddca2fca76333ecf1127935c21757c32b41906438a2394e32",
-                      "size":  28187
+                      "sha256":  "ca0c2b63fdd761cc1733b2ac0a23f56a57ef10a8f771a2d9235d19788ba6e607",
+                      "size":  29413
                   },
                   {
                       "path":  "html/textx.html",
@@ -68,13 +68,18 @@
                   },
                   {
                       "path":  "index.html",
-                      "sha256":  "84d42e72f5249b5be9d4c35738fcd548184d7a9a9cf91b612d76bd236caee524",
-                      "size":  176721
+                      "sha256":  "f1bb3471f11a5ee88d40212273eb87cb994532da9148585e60b1b74a016e3f64",
+                      "size":  181964
                   },
                   {
                       "path":  "js/draw.js",
                       "sha256":  "acb9ed0dec5dc32c09ff4936183e6dc2a7ab9c40b1a6789e8179d705bcdccf16",
                       "size":  3671
+                  },
+                  {
+                      "path":  "js/osaka.js",
+                      "sha256":  "1cab93d308284221ab09b62f85c227bb7ccc96899e7d8d9aaa2bb94fa2825197",
+                      "size":  1438
                   },
                   {
                       "path":  "js/save.js",
@@ -83,8 +88,8 @@
                   },
                   {
                       "path":  "js/scenario-engine.js",
-                      "sha256":  "c4428ed5cd5dc1c957d477641f66fcabc09cabb0f1ca803b5924bcdb3e9b8e51",
-                      "size":  39888
+                      "sha256":  "cdf61959799cedcfe34d92c1c85d65e908d73eaf865570a418bd535f8319863f",
+                      "size":  40797
                   },
                   {
                       "path":  "launcher-messages.ps1",
@@ -1472,6 +1477,11 @@
                       "size":  856626
                   },
                   {
+                      "path":  "resource/remake/layers/title_tower_osaka.png",
+                      "sha256":  "83c55d593dcdb1b2a2269b0baee15d22fee3812d923e9c2615231dbc2697bb04",
+                      "size":  379929
+                  },
+                  {
                       "path":  "resource/remake/layers/title_tower_soft.png",
                       "sha256":  "809a771586a7747ce0fb3b98c9f88d41ba8e5e451f2a3e5eb15afe936c03fa96",
                       "size":  276169
@@ -1822,6 +1832,11 @@
                       "size":  2228
                   },
                   {
+                      "path":  "scenario/osaka.txt",
+                      "sha256":  "225bead1de2517db9b85d43c83bea94f26a855b52db1d0c926c6fed9d98601c8",
+                      "size":  7459
+                  },
+                  {
                       "path":  "scenario/staff-roll.txt",
                       "sha256":  "0add918253e3ceac340045828a4f6a52b13a1da16b517c53baaa881278ec644b",
                       "size":  935
@@ -1923,8 +1938,8 @@
                   },
                   {
                       "path":  "server.py",
-                      "sha256":  "99a48de7c01381313933c9628f358dc5ad0d5cd89f934ef950b7614c60b6e77f",
-                      "size":  8044
+                      "sha256":  "95410c714416115d8818ae29fae4c4d5e6770c9789641f1f9e3163ccecb7c2ac",
+                      "size":  10133
                   },
                   {
                       "path":  "start-server.cmd",
@@ -2783,8 +2798,8 @@
                   },
                   {
                       "path":  "voice/mother_01.mp3",
-                      "sha256":  "e9d14114187785fd6377970a44f08234eda3f4aada7c1b7b81f34cd3dbf4f4e3",
-                      "size":  136474
+                      "sha256":  "d2787896297488667cfb3eb89a9762d6639ade1ea2c279b38a007f0a844b7c5d",
+                      "size":  92695
                   },
                   {
                       "path":  "voice/warning_5_01.mp3",
@@ -2828,12 +2843,20 @@
                   }
               ],
     "changed":  [
+                    "html/scenario-runner.html",
+                    "html/sys.html",
+                    "html/text.html",
                     "index.html",
-                    "scenario/6.txt"
+                    "js/osaka.js",
+                    "js/scenario-engine.js",
+                    "resource/remake/layers/title_tower_osaka.png",
+                    "scenario/osaka.txt",
+                    "server.py",
+                    "voice/mother_01.mp3"
                 ],
     "deleted":  [
 
                 ],
     "schemaVersion":  1,
-    "previousVersion":  "1.0.1"
+    "previousVersion":  "1.0.2"
 }

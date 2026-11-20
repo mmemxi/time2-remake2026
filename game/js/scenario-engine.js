@@ -1,7 +1,6 @@
 (function () {
   "use strict";
 
-  const scenarioFiles = Array.from({length: 12}, (_, index) => `../scenario/${index}.txt`);
   const scenarios = new Map();
   const itemDefinitions = new Map();
   const registers = Array(20).fill(0);
@@ -30,6 +29,20 @@
   let itemRemovedDuringRun = false;
   const optionalScenarioSources = new Map();
 
+  async function fetchWithRetry(url, options = {}, attempts = 4) {
+    let lastError = null;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        return await fetch(url, options);
+      } catch (error) {
+        lastError = error;
+        if (attempt + 1 >= attempts) break;
+        await new Promise((resolve) => setTimeout(resolve, 180 * (attempt + 1)));
+      }
+    }
+    throw lastError || new Error(`通信に失敗しました: ${url}`);
+  }
+
   window.line = (position) => runLocation(top.sys.page, Number(position));
   window.runLocation = runLocation;
   window.setvisual = () => syncLayers();
@@ -41,6 +54,7 @@
   window.isGlobalSkipAvailable = isGlobalSkipAvailable;
   window.getItemInventory = getItemInventory;
   window.refreshItemInventory = () => notifyItemInventory(false);
+  window.prepareScenarioMode = async () => true;
   window.applyMessagePresentation = (stage) => applyPresentationStage(stage, true);
   window.applyPendingPresentation = () => {
     const stage = top.sys.pendingPresentationStage;
@@ -57,8 +71,9 @@
   };
 
   async function loadScenarios() {
+    const scenarioFiles = Array.from({length: 12}, (_, index) => `../scenario/${index}.txt`);
     const texts = await Promise.all(scenarioFiles.map(async (url) => {
-      const response = await fetch(url, {cache: "no-store"});
+      const response = await fetchWithRetry(url, {cache: "no-store"});
       if (!response.ok) throw new Error(`シナリオを読み込めません: ${url} (${response.status})`);
       return response.text();
     }));
@@ -75,7 +90,7 @@
 
   async function loadItemDefinitions() {
     const url = "../scenario/items.txt";
-    const response = await fetch(url, {cache: "no-store"});
+    const response = await fetchWithRetry(url, {cache: "no-store"});
     if (!response.ok) throw new Error("アイテム定義を読み込めません: " + url + " (" + response.status + ")");
     const lines = (await response.text()).replace(/^\uFEFF/, "").replace(/\r/g, "").split("\n");
     lines.forEach((source, index) => {
@@ -151,7 +166,7 @@
     const url = "../scenario/" + sceneNumber + ".txt";
     let source = optionalScenarioSources.get(sceneNumber);
     if (source === undefined) {
-      const response = await fetch(url, {cache: "no-store"});
+      const response = await fetchWithRetry(url, {cache: "no-store"});
       if (!response.ok) throw new Error("グローバルスキップ用シナリオを読み込めません: " + url + " (" + response.status + ")");
       source = await response.text();
     }
@@ -165,7 +180,7 @@
     if (!hasGlobalSkipFlags()) return false;
     if (scenarios.has(99) || optionalScenarioSources.has(99)) return true;
     try {
-      const response = await fetch("../scenario/99.txt", {cache: "no-store"});
+      const response = await fetchWithRetry("../scenario/99.txt", {cache: "no-store"});
       if (!response.ok) return false;
       optionalScenarioSources.set(99, await response.text());
       return true;
@@ -379,7 +394,7 @@
     const previousScene = currentScene;
     currentScene = sceneNumber;
     currentPos = positionNumber;
-    currentSceneName = scene.name || `シーン${sceneNumber}`;
+    currentSceneName = osakaText(scene.name || `シーン${sceneNumber}`);
     top.sys.page = sceneNumber;
     top.sys.line = positionNumber;
     top.sys.clrtxt();
@@ -419,7 +434,7 @@
     top.sys.drawcnt = 0;
     top.sys.draw();
     notifyItemInventory(itemChange);
-    if (!options.suppressSceneTitle && previousScene !== sceneNumber && scene.name && typeof top.showSceneTitle === "function") top.showSceneTitle(scene.name);
+    if (!options.suppressSceneTitle && previousScene !== sceneNumber && scene.name && typeof top.showSceneTitle === "function") top.showSceneTitle(osakaText(scene.name));
   }
 
   function executeCommands(commands, scene, position) {
@@ -428,11 +443,11 @@
       if (stopped) break;
       switch (command.type) {
         case "text":
-          top.sys.put(escapeHtml(command.text).replace(/\n/g, "<br>"));
+          top.sys.put(escapeHtml(osakaText(command.text)).replace(/\n/g, "<br>"), escapeHtml(command.text).replace(/\n/g, "<br>"));
           top.sys.ltxt[top.sys.tcnt].presentationStage = capturePresentationStage(true);
           break;
         case "dialogue":
-          top.sys.putDialogue(command.speaker, command.body, command.voice);
+          top.sys.putDialogue(osakaText(command.speaker), osakaText(command.body), command.voice, command.speaker, command.body);
           top.sys.ltxt[top.sys.tcnt].presentationStage = capturePresentationStage(true);
           break;
         case "bg": setBackground(command.name); break;
@@ -460,7 +475,7 @@
           command.choices.forEach((choice) => {
             if (choice.condition && !evaluateCondition(choice.condition)) return;
             const target = resolveTarget(choice.target, scene.number);
-            top.sys.sel(choice.label, target.pos, target.scene === scene.number ? 0 : target.scene);
+            top.sys.sel(osakaText(choice.label), target.pos, target.scene === scene.number ? 0 : target.scene);
             count += 1;
           });
           if (!count) showRuntimeError(`${scene.sourceName} scene ${scene.number}, pos ${position.number}: 表示できる選択肢がありません`);
@@ -484,7 +499,7 @@
           presentationRevision += 1;
           break;
         case "gameover": top.sys.gameOverPending = true; stopped = true; break;
-        case "ending": top.sys.endingPending = {number: command.number, title: command.title}; stopped = true; break;
+        case "ending": top.sys.endingPending = {number: command.number, title: osakaText(command.title)}; stopped = true; break;
         case "exit": top.sys.exitPending = true; stopped = true; break;
       }
     }
@@ -747,7 +762,13 @@
   }
 
   function currentPositionName() {
-    return scenarios.get(currentScene)?.positions.get(currentPos)?.name || "";
+    return osakaText(scenarios.get(currentScene)?.positions.get(currentPos)?.name || "");
+  }
+
+  function osakaText(value) {
+    return top.osakaDialectMode && typeof top.changeOsakaText === "function"
+      ? top.changeOsakaText(value)
+      : String(value ?? "");
   }
 
   function importScenarioState(state) {

@@ -149,11 +149,8 @@
       if (choiceScreen) choiceScreen.hidden = true;
       if (resumeState?.choicesVisible && top.sys.scnt > 1) showChoices();
       else if (messageUnits.length) {
-        loadMessageUnit(Math.max(0, Math.min(messageUnits.length - 1, Number(resumeState?.messageUnitIndex) || 0)));
-        if (resumeState && Number(resumeState.messagePage) > 0) {
-          messagePage = Math.min(messagePages.length - 1, Number(resumeState.messagePage));
-          showMessagePage();
-        }
+        const unitIndex = Math.max(0, Math.min(messageUnits.length - 1, Number(resumeState?.messageUnitIndex) || 0));
+        loadMessageUnit(unitIndex, Number(resumeState?.messagePage) || 0);
       }
       else if (top.sys.scnt > 1) showChoices();
       else if (top.sys.scnt === 1) document.body.classList.add("visual-only-wait");
@@ -185,7 +182,7 @@
       const sizes = [15, 17, 19, 21, 23];
       const safeLevel = Math.max(1, Math.min(5, Number(level) || 3));
       document.documentElement.style.setProperty("--story-font-size", `${sizes[safeLevel - 1]}px`);
-      if (repaginate && !choicesVisible) prepareMessagePages();
+      if (repaginate && !choicesVisible) prepareMessagePages(messagePage);
     }
 
     function goline(lineNumber) {
@@ -337,7 +334,7 @@
       return true;
     }
 
-    function loadMessageUnit(index) {
+    function loadMessageUnit(index, pageIndex = 0) {
       const content = document.querySelector(".message-content");
       const messageScreen = document.querySelector(".message-screen");
       const nameplate = document.querySelector(".dialogue-nameplate");
@@ -357,12 +354,11 @@
       }
       if (messageWindow) messageWindow.classList.toggle("dialogue-window", dialogue);
       updateWaitIndicator();
-      top.sys.recordMessageHistory(currentUnit);
-      prepareMessagePages();
+      prepareMessagePages(pageIndex);
       if (currentUnit.type === "dialogue" && currentUnit.voice) top.playVoice(currentUnit.voice);
     }
 
-    function prepareMessagePages() {
+    function prepareMessagePages(pageIndex) {
       const content = document.querySelector(".message-content");
       if (!content) return;
       const storyText = originalStoryText || "";
@@ -375,7 +371,7 @@
       const forcedPageSections = currentUnit?.type === "text" ? storyText.split("\uE000") : [storyText];
       forcedPageSections.forEach((section) => appendAutomaticPages(wrapStoryLines(section, content)));
       if (!messagePages.length) messagePages.push([]);
-      messagePage = 0;
+      messagePage = Math.max(0, Math.min(messagePages.length - 1, pageIndex));
       showMessagePage();
     }
 
@@ -416,8 +412,13 @@
         textIndent: "0"
       });
       document.body.append(measurer);
-      logicalLines.forEach((sourceSegments) => {
-        if (!sourceSegments.some((segment) => segment.text)) { result.push([]); return; }
+      logicalLines.forEach((sourceSegments, logicalLineIndex) => {
+        if (!sourceSegments.some((segment) => segment.text)) {
+          const emptyLine = [];
+          emptyLine.logicalLineIndex = logicalLineIndex;
+          result.push(emptyLine);
+          return;
+        }
         measurer.replaceChildren();
         const textNodes = [];
         sourceSegments.forEach((segment) => {
@@ -440,6 +441,7 @@
             if (currentTop === null || Math.abs(rectangle.top - currentTop) > 1) {
               currentTop = rectangle.top;
               currentLine = [];
+              currentLine.logicalLineIndex = logicalLineIndex;
               result.push(currentLine);
             }
             const lastSegment = currentLine.at(-1);
@@ -545,6 +547,30 @@
         });
         if (lineIndex < page.length - 1) content.append(document.createElement("br"));
       });
+      recordVisibleMessagePage();
+    }
+
+    function recordVisibleMessagePage() {
+      if (messageHidden || choicesVisible || !currentUnit) return;
+      const text = historyTextForPage(messagePages[messagePage] || []);
+      if (!text.trim()) return;
+      const speaker = currentUnit.type === "dialogue" ? displayNekomimiText(currentUnit.speaker) : "";
+      top.sys.recordMessageHistory(currentUnit, messagePage, text, speaker);
+    }
+
+    function historyTextForPage(pageLines) {
+      let text = "";
+      let previousLogicalLine = null;
+      pageLines.forEach((line) => {
+        const logicalLine = Number.isInteger(line.logicalLineIndex) ? line.logicalLineIndex : previousLogicalLine;
+        if (previousLogicalLine !== null && logicalLine !== previousLogicalLine) {
+          const lineBreaks = Math.max(1, logicalLine - previousLogicalLine);
+          text += "\n".repeat(lineBreaks);
+        }
+        text += storyLineText(line);
+        previousLogicalLine = logicalLine;
+      });
+      return text;
     }
 
     function showChoices() {
@@ -572,6 +598,7 @@
       messageHidden = hidden;
       document.body.classList.toggle("story-hidden", hidden);
       top.setStoryUiBlocked(hidden);
+      if (!hidden) recordVisibleMessagePage();
     }
 
     function toggleMessageVisibility() {
@@ -596,10 +623,6 @@
       if (typeof top.stopScreenShake === "function") top.stopScreenShake();
       if (choicesVisible) return false;
       if (!top.skipUnreadMessages && !top.sys.currentMessageRead) return "unread";
-      if (messagePage < messagePages.length - 1) {
-        messagePage = messagePages.length - 1;
-        showMessagePage();
-      }
       if (messageUnitIndex < messageUnits.length - 1) {
         top.sys.markCurrentMessageRead();
         loadMessageUnit(messageUnitIndex + 1);
@@ -615,7 +638,13 @@
         showChoices();
         return false;
       }
-      if (top.sys.scnt !== 1) return false;
+      if (top.sys.scnt !== 1) {
+        if (messagePage < messagePages.length - 1) {
+          messagePage = messagePages.length - 1;
+          showMessagePage();
+        }
+        return false;
+      }
       top.sys.markCurrentMessageRead();
       top.sys.skipVisualEffect = true;
       activateChoice(1);
