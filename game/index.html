@@ -1,0 +1,3241 @@
+<!doctype html>
+<html lang="ja" data-game-mode="remake">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>時の封土</title>
+  <style>
+    :root { color-scheme: dark; background: #080b10; }
+    * { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+    img { -webkit-user-drag: none; user-drag: none; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body {
+      display: grid;
+      place-items: center;
+      padding: 8px 8px 76px;
+      background:
+        radial-gradient(circle at 50% 25%, #25303c 0, #0d1219 45%, #050608 100%);
+      font-family: "Yu Gothic UI", "Meiryo", sans-serif;
+    }
+    .game {
+      width: min(100%, calc(177.778vh - 149.333px));
+      width: min(100%, calc(177.778dvh - 149.333px));
+      max-width: 1400px;
+      filter: drop-shadow(0 24px 55px rgba(0, 0, 0, .65));
+    }
+    .stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      border: 1px solid rgba(178, 203, 223, .2);
+      border-radius: 12px 12px 0 0;
+      background: #000;
+    }
+    iframe { display: block; border: 0; }
+    #GRP, #GRP_PREV, #TEXT { position: absolute; inset: 0; width: 100%; height: 100%; background: transparent; }
+    #GRP, #GRP_PREV { pointer-events: none; }
+    #GRP { z-index: 1; opacity: 1; }
+    #GRP_PREV { z-index: 0; opacity: 0; }
+    .stage.graphics-transition #GRP, .stage.graphics-transition #GRP_PREV { transition: opacity .5s ease; }
+    #TEXT { z-index: 2; }
+    #MAIN { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+    .scene-title-card { position:absolute; left:0; top:7%; z-index:4; min-width:min(54%,620px); padding:13px 34px 14px 6%; color:#effbff; background:linear-gradient(90deg,rgba(10,22,31,.92),rgba(19,48,63,.76),transparent); border-top:1px solid rgba(143,215,238,.4); border-bottom:1px solid rgba(143,215,238,.3); font:600 clamp(17px,2.7vw,31px)/1.3 "Yu Mincho","YuMincho",serif; letter-spacing:.12em; text-shadow:0 2px 12px #000; pointer-events:none; transform:translateX(-110%); opacity:0; }
+    .scene-title-card.show { animation:scene-title-slide 4s ease-in-out both; }
+    @keyframes scene-title-slide { 0%{transform:translateX(-110%);opacity:0} 16%,72%{transform:translateX(0);opacity:1} 100%{transform:translateX(-110%);opacity:0} }
+    .start-screen {
+      position: absolute; inset: 0; z-index: 3;
+      display: grid; place-items: center;
+      overflow: hidden;
+      background: #000;
+      container-type: size;
+    }
+    .title-visual-layers { position: absolute; inset: -3%; overflow: hidden; opacity: 1; filter: blur(0) brightness(1); transform: scale(1); pointer-events: none; }
+    .title-background, .title-clouds, .title-tower { position: absolute; inset: 0; }
+    .title-background { z-index: 0; background: url("resource/remake/layers/title_background_no_clouds_no_tower_soft.png") center center / cover no-repeat; }
+    .title-clouds { z-index: 1; overflow: hidden; }
+    .title-cloud-track {
+      position: absolute; inset: 0 auto 0 0;
+      width: 200%; height: 100%;
+      background: url("resource/remake/layers/title_clouds_seamless_2x_soft.png") center center / 100% 100% no-repeat;
+      animation: title-cloud-scroll 240s linear infinite;
+      will-change: transform;
+    }
+    .title-tower { z-index: 2; background: url("resource/remake/layers/title_tower_soft.png") center center / cover no-repeat; }
+    .start-screen.title-revealing .title-visual-layers { animation: title-image-reveal 2.2s cubic-bezier(.2,.65,.25,1) both; }
+    .start-panel { position: relative; z-index: 3; width:min(94cqw,520px); max-height:96cqh; text-align: center; opacity: 1; filter: blur(0) brightness(1); }
+    .start-screen.title-revealing .start-panel { animation: title-ui-reveal 2s .18s cubic-bezier(.2,.65,.25,1) both; }
+    .start-screen.hidden-hotspot { cursor:pointer; }
+    .hidden-hotspot-debug-layer { position:absolute; inset:0; z-index:8; overflow:hidden; pointer-events:none; }
+    .hidden-hotspot-debug-layer[hidden] { display:none; }
+    .hidden-hotspot-marker { position:absolute; width:max(4%,52px); height:max(7.112%,52px); transform:translate(-50%,-50%); border:2px dashed #ff4b4b; border-radius:50%; background:rgba(255,45,45,.2); box-shadow:0 0 0 2px rgba(0,0,0,.55),0 0 18px rgba(255,40,40,.75); }
+    .hidden-hotspot-marker::before, .hidden-hotspot-marker::after { content:""; position:absolute; left:50%; top:50%; background:#fff; box-shadow:0 0 3px #000; transform:translate(-50%,-50%); }
+    .hidden-hotspot-marker::before { width:18px; height:2px; }
+    .hidden-hotspot-marker::after { width:2px; height:18px; }
+    .hidden-hotspot-label { position:absolute; left:50%; top:calc(100% + 5px); transform:translateX(-50%); padding:3px 6px; border-radius:4px; color:#fff; background:rgba(130,0,0,.9); font:700 11px/1.3 "Yu Gothic UI","Meiryo",sans-serif; white-space:nowrap; text-shadow:0 1px 2px #000; }
+    .hidden-image-viewer { position:absolute; inset:0; z-index:12; display:block; overflow:hidden; background:rgba(0,0,0,.88); cursor:pointer; }
+    .hidden-image-viewer[hidden] { display:none; }
+    .hidden-image-viewer img { position:absolute; inset:3%; display:block; width:94%; height:94%; object-fit:contain; filter:drop-shadow(0 12px 34px rgba(0,0,0,.8)); }
+    @keyframes title-cloud-scroll { from { transform: translate3d(-50%, 0, 0); } to { transform: translate3d(0, 0, 0); } }
+    @keyframes title-image-reveal { from { opacity: 0; filter: blur(24px) brightness(.12); transform: scale(1.07); } to { opacity: 1; filter: blur(0) brightness(1); transform: scale(1); } }
+    @keyframes title-ui-reveal { from { opacity: 0; filter: blur(15px) brightness(.25); transform: translateY(10px); } to { opacity: 1; filter: blur(0) brightness(1); transform: translateY(0); } }
+    .start-panel h1 { margin:0 0 clamp(2px,1.1cqh,8px); font:600 clamp(18px,min(6cqw,9cqh),64px)/1.15 "Yu Mincho","YuMincho",serif; letter-spacing:clamp(.08em,.3cqw,.18em); color:#f4fcff; text-shadow:0 2px 3px #000,0 5px 16px #000,0 0 28px rgba(21,45,57,.9); }
+    .start-panel p { margin:0 0 clamp(7px,4.7cqh,34px); color:#e8f4f8; font-size:clamp(9px,2.1cqh,16px); line-height:1.2; letter-spacing:clamp(.08em,.28cqw,.2em); text-shadow:0 2px 3px #000,0 4px 12px #000; }
+    .sound-gate { display: flex; justify-content: center; align-items: center; gap: 8px; margin: -15px 0 20px; color: #b5c8d3; font-size: 13px; letter-spacing: .06em; }
+    .sound-gate input { width: 17px; height: 17px; accent-color: #69cdea; }
+    .start-panel button { width:clamp(120px,45cqw,210px); min-width:0; padding:clamp(4px,1.8cqh,13px) clamp(10px,3.2cqw,28px); border:1px solid #80d9ef; border-radius:999px; color:#effcff; background:rgba(24,59,76,.78); font:600 clamp(9px,2.25cqh,16px)/1.2 "Yu Gothic UI","Meiryo",sans-serif; letter-spacing:clamp(.05em,.25cqw,.16em); cursor:pointer; box-shadow:0 clamp(3px,1.4cqh,10px) clamp(9px,4cqh,28px) rgba(0,0,0,.4); }
+    .start-panel button:hover { background: rgba(38, 91, 113, .9); }
+    .start-actions { display:grid; justify-items:center; gap:clamp(3px,1.65cqh,12px); }
+    #bonusButton { border-color: #d4bb78; color: #fff4d5; background: rgba(76, 58, 24, .76); }
+    #bonusButton:hover { background: rgba(111, 82, 30, .9); }
+    #afterwordButton { border-color: #d4bb78; color: #fff4d5; background: rgba(76, 58, 24, .76); }
+    #afterwordButton:hover { background: rgba(111, 82, 30, .9); }
+    #specialAppendixButton { border-color: #e6a7c9; color: #fff0f8; background: rgba(82, 36, 65, .78); }
+    #specialAppendixButton:hover { background: rgba(119, 48, 91, .92); }
+    #endingReplayButton { border-color: #aaa0df; color: #f2efff; background: rgba(49, 42, 91, .78); }
+    #endingReplayButton:hover { background: rgba(70, 59, 126, .92); }
+    #galleryButton { border-color: #79b9cd; color: #ecfbff; background: rgba(31, 67, 80, .8); }
+    #galleryButton:hover { background: rgba(42, 91, 108, .94); }
+    #musicModeButton { border-color: #8cb5d9; color: #f0f7ff; background: rgba(34, 57, 83, .8); }
+    #musicModeButton:hover { background: rgba(44, 78, 112, .94); }
+    #characterButton { border-color:#d1a4d9; color:#fff3ff; background:rgba(73,43,82,.82); }
+    #characterButton:hover { background:rgba(105,59,119,.94); }
+    .start-screen.hidden { display: none; }
+    .gallery-screen { position:absolute; inset:0; z-index:7; display:grid; grid-template-rows:auto minmax(0,1fr); color:#edf8fc; background:linear-gradient(145deg,#0b1218,#101e27); }
+    .gallery-screen[hidden] { display:none; }
+    .gallery-header { display:flex; align-items:center; gap:18px; padding:14px clamp(16px,3vw,32px); border-bottom:1px solid rgba(130,181,204,.28); background:rgba(7,13,18,.88); }
+    .gallery-header h2 { margin:0; font:500 clamp(20px,3vw,31px) "Yu Mincho","YuMincho",serif; letter-spacing:.14em; }
+    .gallery-header p { margin:0; color:#8fa8b4; font-size:12px; }
+    .gallery-return { margin-left:auto; padding:9px 17px; border:1px solid #547585; border-radius:999px; color:#dbeef5; background:#172832; cursor:pointer; font:600 13px inherit; }
+    .gallery-return:hover { border-color:#84d5e9; background:#22404f; }
+    .gallery-grid { min-height:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(210px,42vw),1fr)); align-content:start; gap:clamp(10px,1.8vw,20px); padding:clamp(14px,2.5vw,28px); overflow-y:auto; overscroll-behavior:contain; }
+    .gallery-card { min-width:0; padding:0; overflow:hidden; border:1px solid #344c59; border-radius:10px; color:#e8f4f8; background:#0a1015; text-align:left; cursor:pointer; font:600 13px inherit; }
+    .gallery-card:hover:not(:disabled), .gallery-card:focus-visible { border-color:#86d7e9; transform:translateY(-1px); outline:none; }
+    .gallery-card:disabled { color:#697780; cursor:default; }
+    .gallery-thumb { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; background:#000; }
+    .gallery-thumb.locked { background:#000; }
+    .gallery-card-title { display:block; padding:10px 12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; }
+    .gallery-viewer { position:absolute; inset:0; z-index:1; overflow:hidden; display:grid; grid-template-rows:minmax(0,1fr) auto; background:#000; cursor:pointer; }
+    .gallery-viewer[hidden] { display:none; }
+    .gallery-image { width:100%; height:100%; min-height:0; display:block; object-fit:contain; background:#000; }
+    .gallery-image[hidden] { display:none; }
+    .gallery-viewer-title { position:relative; z-index:3; min-height:clamp(52px,9vh,84px); padding:12px 20px; display:grid; place-items:center; color:#f5fbfd; background:#080c0f; border-top:1px solid rgba(151,196,213,.25); font:600 clamp(18px,2.7vw,28px) "Yu Mincho","YuMincho",serif; letter-spacing:.08em; text-align:center; text-shadow:0 2px 8px #000; pointer-events:none; }
+    .gallery-edge { position:absolute; top:0; bottom:0; z-index:2; width:15%; display:grid; place-items:center; border:0; color:rgba(239,250,255,.92); background:transparent; cursor:pointer; opacity:0; transition:opacity .18s ease,background .18s ease; font-size:clamp(34px,6vw,72px); text-shadow:0 3px 15px #000; }
+    .gallery-edge:hover, .gallery-edge:focus-visible { opacity:1; background:linear-gradient(90deg,rgba(0,0,0,.48),transparent); outline:none; }
+    .gallery-edge.previous { left:0; }
+    .gallery-edge.next { right:0; }
+    .gallery-edge.next:hover, .gallery-edge.next:focus-visible { background:linear-gradient(270deg,rgba(0,0,0,.48),transparent); }
+    .music-screen { position:absolute; inset:0; z-index:7; display:grid; grid-template-rows:auto minmax(0,1fr); color:#edf8fc; background:#071018; isolation:isolate; }
+    .music-screen[hidden] { display:none; }
+    .music-screen::before { content:""; position:absolute; inset:0; z-index:-2; background:#000 url("resource/remake/jpg/cg82.jpg") center/cover no-repeat; }
+    .music-screen::after { content:""; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,rgba(3,8,13,.92),rgba(5,12,18,.76) 48%,rgba(3,8,13,.84)); backdrop-filter:blur(2px); }
+    .music-header { display:flex; align-items:center; gap:18px; padding:14px clamp(16px,3vw,32px); border-bottom:1px solid rgba(140,190,220,.3); background:rgba(5,12,18,.84); }
+    .music-header h2 { margin:0; font:600 clamp(20px,3vw,32px) "Yu Mincho","YuMincho",serif; letter-spacing:.14em; }
+    .music-header p { margin:3px 0 0; color:#91a9b7; font-size:12px; }
+    .music-return { margin-left:auto; border:1px solid #58798b; border-radius:8px; padding:8px 15px; color:#e5f4fb; background:#132630; cursor:pointer; }
+    .music-layout { min-height:0; display:grid; grid-template-columns:minmax(250px,42%) minmax(0,1fr); gap:clamp(14px,2vw,28px); padding:clamp(14px,2.4vw,30px); }
+    .music-list { min-height:0; overflow-y:auto; display:grid; align-content:start; gap:7px; padding:5px; scrollbar-color:#66899b rgba(4,10,15,.5); }
+    .music-entry { width:100%; display:grid; grid-template-columns:2em minmax(0,1fr); align-items:center; gap:8px; padding:10px 13px; border:1px solid rgba(119,157,177,.28); border-radius:8px; color:#dce9ef; background:rgba(8,18,25,.72); text-align:left; cursor:pointer; }
+    .music-entry:hover { border-color:#78b7d4; background:rgba(18,42,55,.82); }
+    .music-entry.selected { border-color:#a5e4ff; color:#fff; background:rgba(31,76,98,.92); box-shadow:0 0 0 1px rgba(165,228,255,.2),0 7px 20px rgba(0,0,0,.25); }
+    .music-state-mark { color:#8edff7; text-align:center; font-size:14px; }
+    .music-entry-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+    .music-player-panel { min-width:0; min-height:0; display:grid; align-content:center; gap:18px; padding:clamp(20px,4vw,52px); border:1px solid rgba(137,180,201,.24); border-radius:14px; background:rgba(5,13,19,.72); box-shadow:0 18px 48px rgba(0,0,0,.32); }
+    .music-selected-label { color:#8fa8b6; font-size:12px; letter-spacing:.14em; }
+    .music-selected-title { min-height:1.5em; margin:0; font:600 clamp(23px,3.5vw,40px)/1.35 "Yu Mincho","YuMincho",serif; text-shadow:0 2px 10px #000; }
+    .music-selected-creator { min-height:1.4em; margin:0; color:#bfd0d9; font-size:clamp(13px,1.6vw,17px); }
+    .music-selected-description { min-height:4.8em; max-height:min(24vh,180px); margin:0; padding:12px 14px; overflow-y:auto; border-left:2px solid rgba(126,203,230,.52); color:#d6e1e7; background:rgba(4,11,16,.38); font-size:clamp(12px,1.35vw,15px); line-height:1.75; white-space:pre-wrap; }
+    .music-selected-description:empty { visibility:hidden; }
+    .music-now-playing { min-height:1.5em; color:#8edff7; font-size:13px; }
+    .music-progress-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:11px; font-variant-numeric:tabular-nums; font-size:12px; }
+    .music-progress { width:100%; accent-color:#79d8f1; cursor:pointer; }
+    .music-progress:disabled { cursor:default; opacity:.45; }
+    .music-play-button { justify-self:center; min-width:150px; border:1px solid #85cce5; border-radius:999px; padding:11px 28px; color:#effbff; background:rgba(27,77,99,.92); font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; }
+    .music-play-button:disabled { opacity:.45; cursor:default; }
+    @media (max-width:700px) { .music-layout { grid-template-columns:1fr; grid-template-rows:minmax(150px,45%) minmax(0,1fr); } .music-player-panel { padding:18px; gap:11px; } }
+    .character-screen { position:absolute; inset:0; z-index:7; display:grid; grid-template-rows:auto minmax(0,1fr); color:#edf8fc; background:linear-gradient(145deg,#0b1118,#17121b); }
+    .character-screen[hidden] { display:none; }
+    .character-layout { min-height:0; display:grid; grid-template-columns:minmax(180px,27%) minmax(0,1fr); }
+    .character-list { min-height:0; overflow-y:auto; display:grid; align-content:start; gap:8px; padding:clamp(14px,2vw,24px); border-right:1px solid rgba(192,147,204,.25); background:rgba(5,9,14,.52); }
+    .character-entry { width:100%; padding:12px 14px; border:1px solid rgba(166,135,178,.32); border-radius:9px; color:#e9dfee; background:rgba(26,20,31,.8); text-align:left; cursor:pointer; font:600 clamp(13px,1.6vw,17px) inherit; }
+    .character-entry:hover,.character-entry.selected { border-color:#e0b3e9; color:#fff; background:rgba(78,47,88,.9); outline:none; }
+    .character-detail { min-width:0; min-height:0; display:grid; grid-template-columns:minmax(220px,48%) minmax(0,1fr); gap:clamp(16px,2.5vw,32px); padding:clamp(16px,2.6vw,34px); overflow:hidden; }
+    .character-image-area { position:relative; min-width:0; min-height:0; width:100%; height:100%; display:grid; place-items:center; overflow:hidden; border:1px solid rgba(171,139,183,.22); border-radius:12px; background:rgba(0,0,0,.38); }
+    .character-image { position:absolute; inset:0; display:block; width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; object-position:center; cursor:zoom-in; }
+    .character-image[hidden] { display:none; }
+    .character-image-viewer { box-sizing:border-box; position:absolute; inset:0; z-index:5; width:100%; height:100%; display:grid; place-items:center; padding:clamp(8px,1.5vw,18px); overflow:hidden; background:rgba(0,0,0,.94); cursor:zoom-out; }
+    .character-image-viewer[hidden] { display:none; }
+    .character-image-expanded { box-sizing:border-box; display:block; width:100%; height:100%; min-width:0; min-height:0; max-width:100%; max-height:100%; object-fit:contain; object-position:center; pointer-events:none; }
+    .character-copy { min-width:0; min-height:0; display:grid; align-content:center; gap:18px; overflow-y:auto; padding:4px; }
+    .character-name { margin:0; font:600 clamp(25px,4vw,45px)/1.3 "Yu Mincho","YuMincho",serif; letter-spacing:.1em; text-shadow:0 2px 10px #000; }
+    .character-description { margin:0; color:#d7dce2; font-size:clamp(13px,1.5vw,17px); line-height:1.9; white-space:pre-wrap; }
+    .character-quote { margin:4px 0 0; padding:16px 18px; border:1px solid rgba(168,205,221,.3); border-left:3px solid #8edcf0; border-radius:5px 10px 10px 5px; color:#e9faff; background:rgba(9,25,34,.66); font:500 clamp(14px,1.7vw,19px)/1.8 "Yu Gothic UI","Meiryo",sans-serif; text-align:left; white-space:pre-wrap; }
+    button.character-quote { cursor:pointer; }
+    button.character-quote:hover { border-color:#9ce9fa; background:rgba(17,48,62,.78); }
+    .character-empty { place-self:center; color:#8997a1; }
+    @media (max-width:760px) { .character-layout { grid-template-columns:minmax(130px,34%) minmax(0,1fr); } .character-detail { grid-template-columns:1fr; grid-template-rows:minmax(160px,55%) minmax(0,1fr); } .character-copy { align-content:start; gap:10px; } }
+    .audio-gate-screen { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; color: #eaf4f8; background: radial-gradient(circle at 50% 38%, #263947, #0a1016 65%, #040608); }
+    .audio-gate-screen[hidden] { display: none; }
+    .audio-gate-panel { width: min(480px, 88%); padding: 34px 32px; border: 1px solid #526b7b; border-radius: 16px; text-align: center; background: rgba(13,24,32,.94); box-shadow: 0 24px 70px rgba(0,0,0,.7); }
+    .audio-gate-panel h1 { margin: 0 0 15px; font: 500 clamp(23px,4vw,34px) "Yu Mincho","YuMincho",serif; letter-spacing: .12em; }
+    .audio-gate-panel p { margin: 0 0 24px; color: #aebfc9; font-size: 13px; line-height: 1.8; }
+    .audio-gate-panel .sound-gate { margin: 0 0 23px; }
+    .audio-gate-panel button { min-width: 230px; padding: 12px 22px; border: 1px solid #79d6ec; border-radius: 999px; color: #07171d; background: #79d6ec; cursor: pointer; font: 700 14px inherit; }
+    .game-over-screen {
+      position: absolute; inset: 0; z-index: 4;
+      display: grid; place-items: center;
+      background: rgba(2, 4, 7, .32);
+      cursor: pointer;
+      animation: game-over-shade-in 1.35s ease-out both;
+    }
+    .game-over-screen[hidden] { display: none; }
+    .game-over-title {
+      color: #f3e9ea;
+      font: 500 clamp(34px, 7vw, 78px)/1.2 "Yu Mincho", "YuMincho", serif;
+      letter-spacing: .2em;
+      text-indent: .2em;
+      text-shadow: 0 3px 24px rgba(0, 0, 0, .9), 0 0 25px rgba(125, 20, 30, .32);
+      animation: game-over-title-in 1.65s .08s cubic-bezier(.18,.72,.25,1) both;
+    }
+    .stage.game-over-active > iframe { animation: game-over-scene-darken 1.35s ease-out both; }
+    @keyframes game-over-shade-in {
+      from { background: rgba(2, 4, 7, 0); }
+      to { background: rgba(2, 4, 7, .32); }
+    }
+    @keyframes game-over-scene-darken {
+      from { filter: brightness(1) blur(0); transform: scale(1); }
+      to { filter: brightness(.68) blur(2.5px); transform: scale(1.008); }
+    }
+    @keyframes game-over-title-in {
+      from { opacity: .12; filter: blur(13px); transform: translateY(10px) scale(.96); letter-spacing: .28em; }
+      to { opacity: 1; filter: blur(0); transform: translateY(0) scale(1); letter-spacing: .2em; }
+    }
+    .ending-screen, .credits-screen { position: absolute; inset: 0; z-index: 5; }
+    .ending-screen { cursor: pointer; background: transparent; }
+    .ending-screen[hidden], .credits-screen[hidden] { display: none; }
+    .ending-caption {
+      position: absolute; right: 5.5%; bottom: 10%;
+      max-width: 82%; text-align: right;
+      color: #edf8fb; opacity: 0; filter: blur(13px); transform: translateY(18px);
+      text-shadow: 0 3px 18px #000, 0 0 30px rgba(91, 196, 224, .42);
+      animation: ending-caption-in 2.2s ease forwards;
+    }
+    .ending-number { display: block; margin-bottom: .25em; font: 500 clamp(18px, 3vw, 32px)/1.2 "Yu Mincho", "YuMincho", serif; letter-spacing: .14em; }
+    .ending-title { display: block; font: 600 clamp(28px, 5.2vw, 58px)/1.25 "Yu Mincho", "YuMincho", serif; letter-spacing: .1em; }
+    @keyframes ending-caption-in { to { opacity: 1; filter: blur(0); transform: translateY(0); } }
+    .stage.ending-background-out .ending-caption { animation: ending-caption-out 5s ease forwards; }
+    @keyframes ending-caption-out {
+      from { opacity: 1; filter: blur(0); transform: translateY(0); }
+      to { opacity: 0; filter: blur(13px); transform: translateY(-10px); }
+    }
+    .credits-screen { overflow: hidden; color: #eef4f7; background: rgba(0,0,0,.32); cursor: pointer; animation: credits-in .9s ease both; }
+    @keyframes credits-in { from { opacity: 0; } to { opacity: 1; } }
+    .credits-screen.credits-fading-out { pointer-events: none; animation: credits-out 1.2s ease forwards; }
+    @keyframes credits-out { from { opacity: 1; } to { opacity: 0; } }
+    .credits-roll { position: absolute; left: 8%; right: 8%; top: 0; text-align: center; will-change: transform; }
+    .credit-entry { min-height: 42vh; display: grid; place-content: center; gap: 20px; padding: 8vh 0; }
+    .credit-role { color: #b9ced8; font-size: clamp(14px, 2vw, 21px); letter-spacing: .16em; }
+    .credit-name { color: #f5fbfd; font: 500 clamp(20px, 3.5vw, 38px)/1.65 "Yu Mincho", "YuMincho", serif; white-space: pre-line; }
+    .credit-entry.final-credit { min-height: 100vh; }
+    .credits-screen.complete { cursor: pointer; }
+    .credits-hint { position: absolute; right: 3.5%; bottom: 3.5%; z-index: 2; padding: 7px 11px; border-radius: 8px; color: rgba(220,232,238,.68); background: rgba(10,16,21,.52); font-size: clamp(10px,1.3vw,13px); letter-spacing: .05em; pointer-events: none; }
+    .stage.ending-full-fade > #GRP, .stage.ending-full-fade > #GRP_PREV, .stage.ending-full-fade > .ending-screen { opacity: 0 !important; transition: opacity 1.2s ease !important; }
+    .ui-confirm-dialog { width: min(460px, 90vw); margin: auto; padding: 0; border: 1px solid #587184; border-radius: 15px; color: #eaf3f7; background: linear-gradient(145deg,#14222d,#0e171f); box-shadow: 0 25px 80px rgba(0,0,0,.78); }
+    .ui-confirm-dialog::backdrop { background: rgba(2,5,8,.72); backdrop-filter: blur(5px); }
+    .ui-confirm-body { padding: 27px 28px 21px; }
+    .ui-confirm-title { margin: 0 0 13px; color: #f2f8fa; font-size: 19px; letter-spacing: .08em; }
+    .ui-confirm-message { margin: 0; color: #b9cad3; font-size: 14px; line-height: 1.8; white-space: pre-wrap; }
+    .ui-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 15px 20px 19px; border-top: 1px solid rgba(82,106,121,.42); }
+    .ui-confirm-button { min-width: 96px; padding: 10px 17px; border: 1px solid #496273; border-radius: 9px; color: #dceaf0; background: #192a35; cursor: pointer; font: 600 13px inherit; }
+    .ui-confirm-button.primary { border-color: #7bd8ee; color: #07171d; background: #7bd8ee; }
+    .screen-fade-overlay { position: fixed; inset: 0; z-index: 100000; opacity: 0; pointer-events: auto; transition: opacity .55s ease; cursor: pointer; }
+    .screen-fade-overlay[hidden] { display: none; }
+    .toolbar {
+      position: fixed;
+      left: 50%;
+      bottom: 8px;
+      z-index: 20;
+      transform: translateX(-50%);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      width: min(calc(100vw - 16px), 1400px);
+      height: 64px;
+      overflow: hidden;
+      border: 1px solid rgba(178, 203, 223, .2);
+      border-top: 0;
+      border-radius: 0 0 12px 12px;
+      background: rgba(13, 18, 25, .96);
+    }
+    #sys { width: 100%; height: 64px; min-height: 0; align-self: stretch; background: transparent; }
+    html[data-game-mode="original"] .game {
+      width: min(100%, calc(133.333vh - 112px));
+      width: min(100%, calc(133.333dvh - 112px));
+      max-width: 1100px;
+    }
+    html[data-game-mode="original"] .stage { aspect-ratio: 4 / 3; }
+    html[data-game-mode="original"] .toolbar { width: min(calc(100vw - 16px), 1100px); }
+    .save-dialog {
+      width: min(920px, 94vw);
+      max-height: 92vh;
+      margin: auto;
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid #52697a;
+      border-radius: 16px;
+      color: #e9f1f6;
+      background: #101922;
+      box-shadow: 0 28px 90px rgba(0, 0, 0, .8);
+    }
+    .save-dialog::backdrop { background: rgba(2, 5, 8, .82); backdrop-filter: blur(5px); }
+    .settings-dialog { width: min(560px, 92vw); }
+    .history-dialog { width: min(860px, 94vw); height: min(76vh, 720px); }
+    .history-dialog .save-dialog-inner { height: 100%; }
+    .history-list { min-height: 0; overflow-y: auto; padding: 22px 28px 34px; scroll-behavior: auto; }
+    .history-entry { margin: 0 0 18px; color: #eef5f8; font-size: clamp(14px, 1.8vw, 18px); line-height: 1.8; white-space: pre-wrap; }
+    .history-choice { margin-left: 1.4em; padding: 10px 14px; border-left: 3px solid #73d7ee; color: #8fe5f7; background: rgba(38, 91, 113, .24); }
+    .history-speaker { color: #fff25c; }
+    .history-dialogue { color: #75e7ff; }
+    .history-dialogue[data-voice] { cursor: pointer; }
+    .history-dialogue[data-voice]:hover { color: #a8f2ff; text-decoration: underline; text-decoration-color: rgba(168,242,255,.45); }
+    .history-entry.history-read { color: #b7bec6; }
+    .history-read .history-speaker { color: #c2b84d; }
+    .history-read .history-dialogue { color: #5fb8c9; }
+    .history-empty { color: #8398a5; text-align: center; }
+    .item-dialog { width: min(560px, 92vw); }
+    .item-list { min-height: 160px; max-height: min(58vh, 520px); display: grid; align-content: start; gap: 11px; padding: 20px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+    .item-entry { display: flex; align-items: center; gap: 13px; margin: 0; padding: 14px 17px; border: 1px solid #304654; border-radius: 10px; color: #e8f2f6; background: #14222d; font-size: clamp(17px, 2.1vw, 20px); line-height: 1.55; }
+    .item-entry::before { content: "◆"; flex: none; color: #79d9ee; font-size: 12px; }
+    .item-empty { margin: auto; color: #8398a5; text-align: center; font-size: 17px; line-height: 1.7; }
+    .settings-body { display: grid; gap: 26px; padding: 25px 28px 29px; overflow-y: auto; }
+    .settings-dialog.replay-only .setting-row { display: none; }
+    .setting-row { display: grid; gap: 11px; }
+    .setting-label { color: #dce9f0; font-size: 14px; font-weight: 700; letter-spacing: .08em; }
+    .volume-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 13px; }
+    .volume-controls input[type="range"] { width: 100%; accent-color: #70d4eb; }
+    .font-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 13px; }
+    .font-controls input[type="range"] { width: 100%; accent-color: #70d4eb; }
+    .volume-value { width: 2.2em; color: #83dbee; text-align: center; font-variant-numeric: tabular-nums; }
+    .mute-toggle { display: flex; align-items: center; gap: 6px; color: #b8c9d3; white-space: nowrap; }
+    .mute-toggle input { accent-color: #70d4eb; }
+    .mode-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .mode-button { padding: 12px; border: 1px solid #3c5362; border-radius: 9px; color: #bdced7; background: #172630; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; }
+    .mode-button[aria-pressed="true"] { border-color: #76d9ef; color: #07161c; background: #76d9ef; }
+    .return-title-button { width: 100%; padding: 11px; border: 1px solid #665365; border-radius: 9px; color: #ecdfeb; background: #2a202a; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; }
+    .return-title-button:disabled { cursor: default; opacity: .35; }
+    .save-dialog-inner { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: 92vh; }
+    .save-header { display: flex; align-items: center; padding: 17px 20px; border-bottom: 1px solid #2b3c49; }
+    .save-header h2 { margin: 0; font-size: 20px; letter-spacing: .12em; }
+    .save-header p { margin: 3px 0 0 14px; color: #93a8b6; font-size: 12px; }
+    .dialog-close { margin-left: auto; width: 36px; height: 36px; border: 1px solid #425563; border-radius: 50%; color: #d8e7ef; background: #17232d; font-size: 20px; cursor: pointer; }
+    .ending-replay-dialog { width: min(620px, 92vw); }
+    .ending-replay-list { display: grid; gap: 11px; padding: 20px; overflow-y: auto; }
+    .ending-replay-entry { display: grid; grid-template-columns: 8.5em minmax(0, 1fr); gap: 14px; align-items: center; width: 100%; padding: 15px 18px; border: 1px solid #3c5362; border-radius: 10px; color: #edf8fc; background: #152631; text-align: left; cursor: pointer; font: 600 14px "Yu Gothic UI","Meiryo",sans-serif; }
+    .ending-replay-entry:hover:not(:disabled), .ending-replay-entry:focus-visible { border-color: #90dff1; background: #203b4b; outline: none; }
+    .ending-replay-entry:disabled { color: #778892; background: #111b22; cursor: default; opacity: .68; }
+    .ending-replay-number { color: #91dded; letter-spacing: .08em; }
+    .ending-replay-entry:disabled .ending-replay-number { color: #697983; }
+    .slot-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 16px 20px; overflow: auto; }
+    .save-slot {
+      min-width: 0; min-height: 126px;
+      display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 14px; align-items: center;
+      padding: 10px; border: 1px solid #304654; border-radius: 11px;
+      color: #ecf5fa; background: #14222d; text-align: left; cursor: pointer;
+      transition: border-color .15s ease, transform .15s ease, background .15s ease;
+    }
+    .save-slot:hover:not(:disabled), .save-slot:focus-visible { transform: translateY(-1px); border-color: #7edaf0; background: #1b3241; outline: none; }
+    .save-slot:disabled { cursor: default; opacity: .62; }
+    .slot-preview { width: 160px; aspect-ratio: 4/3; display: grid; place-items: center; overflow: hidden; border-radius: 7px; color: #657784; background: #05080b; font-size: 12px; }
+    .slot-preview img { width: 100%; height: 100%; object-fit: cover; }
+    .slot-number { display: block; color: #82dbef; font-size: 15px; font-weight: 700; letter-spacing: .08em; }
+    .slot-date { display: block; margin-top: 8px; color: #a9bbc6; font-size: 12px; line-height: 1.6; }
+    .slot-scene { display: block; margin-top: 5px; color: #718895; font-size: 11px; }
+    .save-pager { display: flex; justify-content: center; gap: 5px; padding: 13px 16px 16px; border-top: 1px solid #2b3c49; }
+    .page-button { min-width: 34px; height: 32px; border: 1px solid #3a5060; border-radius: 7px; color: #b9cbd5; background: #17252f; cursor: pointer; }
+    .page-button.active { border-color: #7edaf0; color: #07151b; background: #7edaf0; font-weight: 700; }
+    .page-arrow { width: 42px; font-size: 18px; }
+    .page-arrow:disabled { cursor: default; opacity: .28; }
+    @media (max-width: 620px) {
+      .game { width: 100%; }
+      .stage, .toolbar { border-radius: 0; }
+      .slot-grid { grid-template-columns: 1fr; }
+      .save-slot { grid-template-columns: 120px minmax(0, 1fr); }
+      .slot-preview { width: 120px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="game" aria-label="時の封土 ゲーム画面">
+    <section class="stage" aria-label="物語画面">
+      <iframe id="GRP_PREV" src="html/layerx.html?v=20260828-screenfade1" title="切り替え前の背景画像" scrolling="no" aria-hidden="true"></iframe>
+      <iframe id="GRP" name="GRP" src="html/layerx.html?v=20260828-screenfade1" title="背景画像" scrolling="no"></iframe>
+      <iframe id="TEXT" name="TEXT" src="html/textx.html?v=20261107-contextmenu1" title="メッセージと選択肢"></iframe>
+      <iframe id="MAIN" name="MAIN" src="html/scenario-runner.html?v=20261119-shake-boundary1" title="TXTシナリオ制御" scrolling="no"></iframe>
+      <div class="scene-title-card" id="sceneTitleCard" aria-live="polite"></div>
+      <div class="audio-gate-screen" id="audioGateScreen">
+        <div class="audio-gate-panel"><h1>音声再生の設定</h1><p>タイトル画面とゲーム内の音楽・ボイスを再生するため、音声再生を有効にします。</p><label class="sound-gate"><input type="checkbox" id="soundGate" checked>音声を有効にする</label><button type="button" id="audioGateContinue">タイトル画面へ</button></div>
+      </div>
+      <div class="start-screen hidden" id="startScreen">
+        <div class="title-visual-layers" aria-hidden="true">
+          <div class="title-background"></div>
+          <div class="title-clouds"><div class="title-cloud-track"></div></div>
+          <div class="title-tower"></div>
+        </div>
+        <div class="start-panel">
+          <h1 id="titleMainText">時の封土</h1>
+          <p id="titleSubText">THE SEAL OF TIME</p>
+          <div class="start-actions">
+            <button type="button" id="startButton">初めから</button>
+            <button type="button" id="continueButton">続きから</button>
+            <button type="button" id="endingReplayButton" hidden>エンディング</button>
+            <button type="button" id="bonusButton" hidden>おまけ</button>
+            <button type="button" id="afterwordButton" hidden>あとがき</button>
+            <button type="button" id="specialAppendixButton" hidden>特別付録</button>
+            <button type="button" id="galleryButton" hidden>ギャラリー</button>
+            <button type="button" id="musicModeButton" hidden>音楽</button>
+            <button type="button" id="characterButton" hidden>キャラクター紹介</button>
+            <button type="button" id="titleMenuBackButton" hidden>戻る</button>
+          </div>
+        </div>
+        <div class="hidden-hotspot-debug-layer" id="hiddenHotspotDebugLayer" aria-hidden="true" hidden></div>
+      </div>
+      <div class="hidden-image-viewer" id="hiddenImageViewer" role="button" aria-label="隠し画像。クリックすると閉じます" hidden>
+        <img id="hiddenImage" alt="隠し画像">
+      </div>
+      <section class="gallery-screen" id="galleryScreen" aria-label="ギャラリー" hidden>
+        <header class="gallery-header"><div><h2>ギャラリー</h2><p>物語の中で見たイラスト</p></div><button type="button" class="gallery-return" id="galleryReturnButton">タイトルに戻る</button></header>
+        <div class="gallery-grid" id="galleryGrid"></div>
+        <div class="gallery-viewer" id="galleryViewer" hidden>
+          <img class="gallery-image" id="galleryImage" alt="">
+          <button type="button" class="gallery-edge previous" id="galleryPrevious" aria-label="前の画像">‹</button>
+          <button type="button" class="gallery-edge next" id="galleryNext" aria-label="次の画像">›</button>
+          <div class="gallery-viewer-title" id="galleryViewerTitle"></div>
+        </div>
+      </section>
+      <section class="character-screen" id="characterScreen" aria-label="キャラクター紹介" hidden>
+        <header class="gallery-header"><div><h2>キャラクター紹介</h2><p>物語を彩る登場人物たち</p></div><button type="button" class="gallery-return" id="characterReturnButton">おまけに戻る</button></header>
+        <div class="character-layout">
+          <nav class="character-list" id="characterList" aria-label="キャラクター一覧"></nav>
+          <section class="character-detail" id="characterDetail">
+            <div class="character-image-area"><img class="character-image" id="characterImage" alt="" hidden><p class="character-empty" id="characterEmpty">名前を選択してください</p></div>
+            <div class="character-copy"><h3 class="character-name" id="characterName"></h3><p class="character-description" id="characterDescription"></p><div id="characterQuoteArea"></div></div>
+          </section>
+        </div>
+        <div class="character-image-viewer" id="characterImageViewer" role="button" tabindex="0" aria-label="拡大画像。クリックすると閉じます" hidden><img class="character-image-expanded" id="characterImageExpanded" alt=""></div>
+      </section>
+      <section class="music-screen" id="musicScreen" aria-label="音楽モード" hidden>
+        <header class="music-header"><div><h2>音楽</h2><p>曲を選び、もう一度クリックすると再生します</p></div><button type="button" class="music-return" id="musicReturnButton">タイトルに戻る</button></header>
+        <div class="music-layout">
+          <div class="music-list" id="musicList" role="listbox" aria-label="楽曲一覧"></div>
+          <section class="music-player-panel" aria-label="音楽プレイヤー">
+            <div class="music-selected-label">選択中の曲</div>
+            <h3 class="music-selected-title" id="musicSelectedTitle">曲を選択してください</h3>
+            <p class="music-selected-creator" id="musicSelectedCreator"></p>
+            <p class="music-selected-description" id="musicSelectedDescription"></p>
+            <div class="music-now-playing" id="musicNowPlaying">停止中</div>
+            <div class="music-progress-row"><span id="musicCurrentTime">0:00</span><input class="music-progress" id="musicProgress" type="range" min="0" max="0" step="0.01" value="0" aria-label="再生位置" disabled><span id="musicTotalTime">0:00</span></div>
+            <button type="button" class="music-play-button" id="musicPlayButton" disabled>再生</button>
+          </section>
+        </div>
+      </section>
+      <div class="game-over-screen" id="gameOverScreen" role="button" tabindex="-1" aria-label="ゲームオーバー。クリックまたはキー入力でタイトルへ戻ります" hidden>
+        <div class="game-over-title">GAME OVER</div>
+      </div>
+      <div class="ending-screen" id="endingScreen" tabindex="-1" aria-label="エンディング。クリックでスタッフロールへ進みます" hidden>
+        <div class="ending-caption"><span class="ending-number" id="endingNumber"></span><span class="ending-title" id="endingTitle"></span></div>
+      </div>
+      <div class="credits-screen" id="creditsScreen" aria-label="スタッフロール" hidden><div class="credits-roll" id="creditsRoll"></div><div class="credits-hint">画面をクリックするとタイトルに戻ります</div></div>
+    </section>
+  </main>
+  <section class="toolbar" aria-label="ゲーム操作" style="visibility:hidden">
+      <iframe id="sys" name="sys" src="html/sys.html?v=20261119-shake-terminal2" title="ゲーム操作"></iframe>
+  </section>
+  <div class="screen-fade-overlay" id="screenFadeOverlay" aria-label="画面切替中。クリックすると演出をスキップします" hidden></div>
+  <dialog class="save-dialog" id="saveDialog">
+    <div class="save-dialog-inner">
+      <header class="save-header">
+        <h2 id="saveDialogTitle">セーブ</h2>
+        <p id="saveDialogHint">保存先を選択してください</p>
+        <button type="button" class="dialog-close" id="saveDialogClose" aria-label="閉じる">×</button>
+      </header>
+      <section class="slot-grid" id="slotGrid" aria-live="polite"></section>
+      <nav class="save-pager" id="savePager" aria-label="セーブページ"></nav>
+    </div>
+  </dialog>
+  <dialog class="save-dialog ending-replay-dialog" id="endingReplayDialog">
+    <div class="save-dialog-inner">
+      <header class="save-header">
+        <h2>エンディング</h2>
+        <p>達成済みのエンディングを再生します</p>
+        <button type="button" class="dialog-close" id="endingReplayDialogClose" aria-label="閉じる">×</button>
+      </header>
+      <section class="ending-replay-list" id="endingReplayList"></section>
+    </div>
+  </dialog>
+  <dialog class="ui-confirm-dialog" id="uiConfirmDialog">
+    <div class="ui-confirm-body"><h2 class="ui-confirm-title" id="uiConfirmTitle"></h2><p class="ui-confirm-message" id="uiConfirmMessage"></p></div>
+    <div class="ui-confirm-actions"><button type="button" class="ui-confirm-button" id="uiConfirmCancel">キャンセル</button><button type="button" class="ui-confirm-button primary" id="uiConfirmOk">OK</button></div>
+  </dialog>
+  <dialog class="save-dialog settings-dialog" id="settingsDialog">
+    <div class="save-dialog-inner">
+      <header class="save-header">
+        <h2 id="settingsDialogTitle">設定</h2>
+        <p id="settingsDialogHint">枠外のクリック、右クリック、または0キーで閉じます</p>
+        <button type="button" class="dialog-close" id="settingsDialogClose" aria-label="閉じる">×</button>
+      </header>
+      <section class="settings-body">
+        <div class="setting-row">
+          <span class="setting-label">音楽ボリューム</span>
+          <div class="volume-controls">
+            <input type="range" id="musicVolume" min="0" max="10" step="1" value="8" aria-label="音楽ボリューム">
+            <output class="volume-value" id="musicVolumeValue">8</output>
+            <label class="mute-toggle"><input type="checkbox" id="musicMute">ミュート</label>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">ボイス再生ボリューム</span>
+          <div class="volume-controls">
+            <input type="range" id="voiceVolume" min="1" max="10" step="1" value="8" aria-label="ボイス再生ボリューム">
+            <output class="volume-value" id="voiceVolumeValue">8</output>
+            <label class="mute-toggle"><input type="checkbox" id="voiceMute">ミュート</label>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">システム音ボリューム</span>
+          <div class="volume-controls">
+            <input type="range" id="systemSoundVolume" min="0" max="10" step="1" value="8" aria-label="システム音ボリューム">
+            <output class="volume-value" id="systemSoundVolumeValue">8</output>
+            <label class="mute-toggle"><input type="checkbox" id="systemSoundMute">ミュート</label>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">効果音ボリューム</span>
+          <div class="volume-controls">
+            <input type="range" id="scenarioSoundVolume" min="0" max="10" step="1" value="8" aria-label="効果音ボリューム">
+            <output class="volume-value" id="scenarioSoundVolumeValue">8</output>
+            <label class="mute-toggle"><input type="checkbox" id="scenarioSoundMute">ミュート</label>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">フォントサイズ</span>
+          <div class="font-controls">
+            <input type="range" id="fontSize" min="1" max="5" step="1" value="3" aria-label="フォントサイズ">
+            <output class="volume-value" id="fontSizeValue">3</output>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">ゲームモード</span>
+          <div class="mode-buttons">
+            <button type="button" class="mode-button" data-mode="remake" aria-pressed="true">リメイク版</button>
+            <button type="button" class="mode-button" data-mode="original" aria-pressed="false">原作版</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">画像エフェクト</span>
+          <div class="mode-buttons">
+            <button type="button" class="mode-button" data-image-effect="on" aria-pressed="true">有り</button>
+            <button type="button" class="mode-button" data-image-effect="off" aria-pressed="false">無し</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">未読部分をスキップ</span>
+          <div class="mode-buttons">
+            <button type="button" class="mode-button" data-skip-unread="true" aria-pressed="false">する</button>
+            <button type="button" class="mode-button" data-skip-unread="false" aria-pressed="true">しない</button>
+          </div>
+        </div>
+        <button type="button" class="return-title-button" id="returnTitleButton">タイトルに戻る</button>
+      </section>
+    </div>
+  </dialog>
+  <dialog class="save-dialog item-dialog" id="itemDialog">
+    <div class="save-dialog-inner">
+      <header class="save-header">
+        <h2>所持アイテム</h2>
+        <p id="itemDialogCount">0個</p>
+        <button type="button" class="dialog-close" id="itemDialogClose" aria-label="閉じる">×</button>
+      </header>
+      <section class="item-list" id="itemList" aria-live="polite"></section>
+    </div>
+  </dialog>
+  <dialog class="save-dialog history-dialog" id="historyDialog">
+    <div class="save-dialog-inner">
+      <header class="save-header">
+        <h2>テキスト履歴</h2>
+        <p>これまでに読んだ文章と選択肢</p>
+        <button type="button" class="dialog-close" id="historyDialogClose" aria-label="閉じる">×</button>
+      </header>
+      <section class="history-list" id="historyList" aria-live="polite"></section>
+    </div>
+  </dialog>
+  <script>
+    const startScreen = document.getElementById("startScreen");
+    const hiddenImageViewer = document.getElementById("hiddenImageViewer");
+    const hiddenImage = document.getElementById("hiddenImage");
+    const hiddenHotspotDebugLayer = document.getElementById("hiddenHotspotDebugLayer");
+    const audioGateScreen = document.getElementById("audioGateScreen");
+    const gameShell = document.querySelector(".game");
+    const stage = document.querySelector(".stage");
+    const gameOverScreen = document.getElementById("gameOverScreen");
+    const endingScreen = document.getElementById("endingScreen");
+    const creditsScreen = document.getElementById("creditsScreen");
+    const creditsRoll = document.getElementById("creditsRoll");
+    const bonusButton = document.getElementById("bonusButton");
+    const afterwordButton = document.getElementById("afterwordButton");
+    const specialAppendixButton = document.getElementById("specialAppendixButton");
+    const galleryButton = document.getElementById("galleryButton");
+    const galleryScreen = document.getElementById("galleryScreen");
+    const galleryGrid = document.getElementById("galleryGrid");
+    const galleryViewer = document.getElementById("galleryViewer");
+    const galleryImage = document.getElementById("galleryImage");
+    const galleryViewerTitle = document.getElementById("galleryViewerTitle");
+    const musicModeButton = document.getElementById("musicModeButton");
+    const characterButton = document.getElementById("characterButton");
+    const characterScreen = document.getElementById("characterScreen");
+    const characterList = document.getElementById("characterList");
+    const characterImage = document.getElementById("characterImage");
+    const characterImageViewer = document.getElementById("characterImageViewer");
+    const characterImageExpanded = document.getElementById("characterImageExpanded");
+    const characterEmpty = document.getElementById("characterEmpty");
+    const characterName = document.getElementById("characterName");
+    const characterDescription = document.getElementById("characterDescription");
+    const characterQuoteArea = document.getElementById("characterQuoteArea");
+    const musicScreen = document.getElementById("musicScreen");
+    const musicList = document.getElementById("musicList");
+    const musicSelectedTitle = document.getElementById("musicSelectedTitle");
+    const musicSelectedCreator = document.getElementById("musicSelectedCreator");
+    const musicSelectedDescription = document.getElementById("musicSelectedDescription");
+    const musicNowPlaying = document.getElementById("musicNowPlaying");
+    const musicProgress = document.getElementById("musicProgress");
+    const musicCurrentTime = document.getElementById("musicCurrentTime");
+    const musicTotalTime = document.getElementById("musicTotalTime");
+    const musicPlayButton = document.getElementById("musicPlayButton");
+    const titleMenuBackButton = document.getElementById("titleMenuBackButton");
+    const lifecyclePingUrl = "/api/lifecycle/ping";
+    const lifecycleCloseUrl = "/api/lifecycle/close";
+
+    document.addEventListener("selectstart", (event) => event.preventDefault());
+    document.addEventListener("dragstart", (event) => event.preventDefault());
+    const endingReplayButton = document.getElementById("endingReplayButton");
+    const endingReplayDialog = document.getElementById("endingReplayDialog");
+    const endingReplayList = document.getElementById("endingReplayList");
+    const uiConfirmDialog = document.getElementById("uiConfirmDialog");
+    const uiConfirmTitle = document.getElementById("uiConfirmTitle");
+    const uiConfirmMessage = document.getElementById("uiConfirmMessage");
+    const uiConfirmOk = document.getElementById("uiConfirmOk");
+    const uiConfirmCancel = document.getElementById("uiConfirmCancel");
+    const screenFadeOverlay = document.getElementById("screenFadeOverlay");
+    const sceneTitleCard = document.getElementById("sceneTitleCard");
+    let uiDialogResolve = null;
+    const saveDialog = document.getElementById("saveDialog");
+    const slotGrid = document.getElementById("slotGrid");
+    const savePager = document.getElementById("savePager");
+    const settingsDialog = document.getElementById("settingsDialog");
+    const itemDialog = document.getElementById("itemDialog");
+    const itemList = document.getElementById("itemList");
+    const itemDialogCount = document.getElementById("itemDialogCount");
+    const historyDialog = document.getElementById("historyDialog");
+    const historyList = document.getElementById("historyList");
+    const musicVolume = document.getElementById("musicVolume");
+    const musicVolumeValue = document.getElementById("musicVolumeValue");
+    const musicMute = document.getElementById("musicMute");
+    const voiceVolume = document.getElementById("voiceVolume");
+    const voiceVolumeValue = document.getElementById("voiceVolumeValue");
+    const voiceMute = document.getElementById("voiceMute");
+    const systemSoundVolume = document.getElementById("systemSoundVolume");
+    const systemSoundVolumeValue = document.getElementById("systemSoundVolumeValue");
+    const systemSoundMute = document.getElementById("systemSoundMute");
+    const scenarioSoundVolume = document.getElementById("scenarioSoundVolume");
+    const scenarioSoundVolumeValue = document.getElementById("scenarioSoundVolumeValue");
+    const scenarioSoundMute = document.getElementById("scenarioSoundMute");
+    const fontSize = document.getElementById("fontSize");
+    const fontSizeValue = document.getElementById("fontSizeValue");
+    let saveMode = "save";
+    let savePage = 0;
+    const lastSaveLoadSlotKey = "Time2:LastSaveLoadSlot";
+    let lastSaveWheelAt = 0;
+    let storyUiBlocked = false;
+    let controlSkipActive = false;
+    let buttonSkipActive = false;
+    let skipTimer = 0;
+    let endingActive = false;
+    let activeEndingNumber = null;
+    let staffCreditsPromise = null;
+    let endingCaptionExitTimer = 0;
+    let creditsStarting = false;
+    let creditsComplete = false;
+    let creditsAnimationFrame = 0;
+    let galleryActive = false;
+    let galleryDefinitions = [];
+    let galleryCurrentIndex = -1;
+    let galleryRenderGeneration = 0;
+    let musicModeActive = false;
+    let musicDefinitions = [];
+    let musicSelectedIndex = -1;
+    let musicPlayingIndex = -1;
+    let characterModeActive = false;
+    let characterDefinitions = [];
+    let characterSelectedIndex = -1;
+    let titleMenuPage = "main";
+    let hiddenImageDefinitions = [];
+    let hiddenImageDebugEnabled = false;
+
+    function notifyServerTabActive() {
+      fetch(lifecyclePingUrl, {method:"POST", cache:"no-store", keepalive:true}).catch(() => {});
+    }
+
+    notifyServerTabActive();
+    setInterval(notifyServerTabActive, 10000);
+    window.addEventListener("pagehide", () => {
+      try { navigator.sendBeacon(lifecycleCloseUrl); } catch (error) {}
+    });
+    let screenFadeActive = false;
+    let screenFadeAdvanced = false;
+    let screenFadePhase = "idle";
+    let activeScreenFadeRequest = null;
+    let gameOverExitFade = false;
+    let titleStartTransitionActive = false;
+    let queuedScreenFade = null;
+    let exitAfterScreenFade = false;
+    let screenFadeTimers = [];
+    let currentItemInventory = [];
+    let itemFlashTimer = 0;
+    window.bonusMode = false;
+    window.endingReplayMode = false;
+    window.lastEndingNumber = Math.max(0, Math.min(5, Number(localStorage.getItem("Time2:LastEnding")) || 0));
+    const endingReplayDefinitions = [
+      {number:1, title:"愛は時を超えて", position:50},
+      {number:2, title:"限られた時を生きる君に", position:30},
+      {number:3, title:"届かない想い", position:40},
+      {number:4, title:"無知という名の罪", position:20},
+      {number:5, title:"通り過ぎた日々", position:10}
+    ];
+    const bgmPlayer = new Audio();
+    const voicePlayer = new Audio();
+    const musicModePlayer = new Audio();
+    const loopingScenarioSoundPlayer = new Audio();
+    const activeScenarioSoundPlayers = new Set();
+    const activeSystemSoundPlayers = new Set();
+    const systemSoundFiles = {
+      focus:"sys_focus", click:"sys_click", message:"sys_message",
+      choiceFocus:"sys_choice_focus", choiceClick:"sys_choice_click", cancel:"sys_cancel",
+      dialog:"sys_dialog", error:"sys_error", save:"sys_save", load:"sys_load",
+      page:"sys_page", item:"sys_item"
+    };
+    let loopingScenarioSoundName = "";
+    let failedLoopingScenarioSoundName = "";
+    musicModePlayer.preload = "metadata";
+    musicModePlayer.loop = false;
+    const voiceCacheSession = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    const soundEffectCacheSession = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    let voiceCacheSerial = 0;
+    let soundEffectCacheSerial = 0;
+    let voiceRequestToken = 0;
+    let voiceLoading = false;
+    let voiceQueue = [];
+    let audioUnlocked = false;
+    let audioPlaybackAllowed = false;
+    let requestedBgm = "";
+    let playingBgmRequest = "";
+    let playingBgmSource = "";
+    let bgmSwitchToken = 0;
+    let bgmScreenFadeAnimationFrame = 0;
+    let bgmScreenFadeState = null;
+    let loopingSoundFadeAnimationFrame = 0;
+    let loopingSoundFadeState = null;
+    let graphicsTransitionToken = 0;
+    let screenShakeAnimation = null;
+    let currentGraphicsHtml = graphicsDocument("<body></body>");
+    let activeGraphicsFrameId = "GRP";
+    let graphicsTransitionBusy = false;
+    let pendingGraphicsRequest = null;
+    let currentResolvedLayers = {jpg: [], gif: []};
+    const assetExistenceCache = new Map();
+    window.sceneAssetVersion = Date.now().toString(36);
+    window.gameMode = localStorage.getItem("Time2:GameMode") === "original" ? "original" : "remake";
+    window.nekomimiMode = false;
+    window.imageEffectsEnabled = localStorage.getItem("Time2:ImageEffects") !== "false";
+    window.skipUnreadMessages = localStorage.getItem("Time2:SkipUnread") === "true";
+    window.fontSizeLevel = Math.max(1, Math.min(5, Number(localStorage.getItem("Time2:FontSize")) || 3));
+
+    void loadHiddenImageDefinitions();
+
+    document.addEventListener("contextmenu", (event) => event.preventDefault(), {capture:true});
+
+    document.getElementById("audioGateContinue").addEventListener("click", async () => {
+      audioPlaybackAllowed = document.getElementById("soundGate").checked;
+      window.frames.sys.document.FORM2.C_BGM.checked = audioPlaybackAllowed;
+      if (audioPlaybackAllowed) await unlockAudio();
+      audioGateScreen.hidden = true;
+      document.querySelector(".toolbar").style.visibility = "";
+      showTitleScreen();
+    });
+    document.getElementById("startButton").addEventListener("click", async () => {
+      let startScene = 0;
+      const globalSkipAvailable = window.frames.MAIN
+        && typeof window.frames.MAIN.isGlobalSkipAvailable === "function"
+        && await window.frames.MAIN.isGlobalSkipAvailable();
+      if (globalSkipAvailable) {
+        const useGlobalSkip = await showUiDialog({
+          title: "グローバルスキップ",
+          message: "グローバルスキップしますか？",
+          confirmText: "はい",
+          cancelText: "いいえ"
+        });
+        if (useGlobalSkip) startScene = 99;
+      }
+      await startNewGameTransition(startScene);
+    });
+    document.getElementById("continueButton").addEventListener("click", () => openSaveManager("load"));
+    endingReplayButton.addEventListener("click", openEndingReplayDialog);
+    bonusButton.addEventListener("click", showBonusTitleMenu);
+    afterwordButton.addEventListener("click", startBonusMode);
+    specialAppendixButton.addEventListener("click", startSpecialAppendixMode);
+    galleryButton.addEventListener("click", openGallery);
+    musicModeButton.addEventListener("click", openMusicMode);
+    characterButton.addEventListener("click", openCharacterMode);
+    titleMenuBackButton.addEventListener("click", showMainTitleMenu);
+    document.getElementById("characterReturnButton").addEventListener("click", closeCharacterModeToBonus);
+    characterImage.addEventListener("click", openCharacterImageViewer);
+    characterImageViewer.addEventListener("click", closeCharacterImageViewer);
+    characterScreen.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      playSystemSound("cancel");
+      if (!characterImageViewer.hidden) closeCharacterImageViewer();
+      else closeCharacterModeToBonus();
+    });
+    document.getElementById("musicReturnButton").addEventListener("click", closeMusicModeToTitle);
+    musicPlayButton.addEventListener("click", toggleSelectedMusicPlayback);
+    musicProgress.addEventListener("input", () => {
+      if (musicPlayingIndex < 0 || !Number.isFinite(musicModePlayer.duration)) return;
+      musicModePlayer.currentTime = Math.max(0, Math.min(musicModePlayer.duration, Number(musicProgress.value) || 0));
+      updateMusicPlayerDisplay();
+    });
+    musicScreen.addEventListener("contextmenu", (event) => { event.preventDefault(); playSystemSound("cancel"); closeMusicModeToTitle(); });
+    startScreen.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      playSystemSound("cancel");
+      if (titleMenuPage === "bonus") showMainTitleMenu();
+    });
+    startScreen.addEventListener("click", handleHiddenTitlePoint);
+    startScreen.addEventListener("pointermove", updateHiddenTitleCursor);
+    startScreen.addEventListener("pointerleave", clearHiddenTitleCursor);
+    hiddenImageViewer.addEventListener("click", closeHiddenImage);
+    hiddenImageViewer.addEventListener("contextmenu", (event) => { event.preventDefault(); closeHiddenImage(); });
+    hiddenImage.addEventListener("error", closeHiddenImage);
+    document.getElementById("galleryReturnButton").addEventListener("click", closeGalleryToTitle);
+    document.getElementById("galleryPrevious").addEventListener("click", (event) => { event.stopPropagation(); moveGalleryImage(-1); });
+    document.getElementById("galleryNext").addEventListener("click", (event) => { event.stopPropagation(); moveGalleryImage(1); });
+    galleryViewer.addEventListener("click", closeGalleryViewer);
+    galleryScreen.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      playSystemSound("cancel");
+      if (!galleryViewer.hidden) closeGalleryViewer();
+      else closeGalleryToTitle();
+    });
+    document.getElementById("sys").addEventListener("load", () => {
+      updateTitleMenuState();
+      updateItemInventory(currentItemInventory, false);
+      installSystemSoundHandlers(window.frames.sys.document);
+    });
+    document.addEventListener("pointerdown", resumeTitleBgmAfterInteraction, {capture:true});
+    document.addEventListener("keydown", resumeTitleBgmAfterInteraction, {capture:true});
+    gameOverScreen.addEventListener("pointerdown", handleGameOverPointerDown);
+    endingScreen.addEventListener("click", beginCredits);
+    creditsScreen.addEventListener("click", finishEnding);
+    screenFadeOverlay.addEventListener("click", skipScreenFade);
+    document.addEventListener("wheel", (event) => { if (endingActive || screenFadeActive) event.preventDefault(); }, {capture:true,passive:false});
+    document.getElementById("saveDialogClose").addEventListener("click", () => saveDialog.close());
+    document.getElementById("endingReplayDialogClose").addEventListener("click", () => endingReplayDialog.close());
+    endingReplayDialog.addEventListener("click", (event) => { if (event.target === endingReplayDialog) endingReplayDialog.close(); });
+    endingReplayDialog.addEventListener("contextmenu", (event) => { event.preventDefault(); playSystemSound("cancel"); endingReplayDialog.close(); });
+    document.getElementById("settingsDialogClose").addEventListener("click", () => settingsDialog.close());
+    settingsDialog.addEventListener("click", (event) => {
+      if (event.target === settingsDialog) settingsDialog.close();
+    });
+    document.getElementById("itemDialogClose").addEventListener("click", () => itemDialog.close());
+    document.getElementById("historyDialogClose").addEventListener("click", closeHistory);
+    historyDialog.addEventListener("close", () => setStoryUiBlocked(false));
+    historyDialog.addEventListener("contextmenu", (event) => { event.preventDefault(); closeHistory(); });
+    settingsDialog.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      playSystemSound("cancel");
+      settingsDialog.close();
+    });
+    itemDialog.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      playSystemSound("cancel");
+      itemDialog.close();
+    });
+    itemDialog.addEventListener("close", updateTitleMenuState);
+    settingsDialog.addEventListener("close", updateTitleMenuState);
+    saveDialog.addEventListener("close", updateTitleMenuState);
+    saveDialog.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      playSystemSound("cancel");
+      saveDialog.close();
+    });
+    saveDialog.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      const now = Date.now();
+      if (now - lastSaveWheelAt < 220 || event.deltaY === 0) return;
+      lastSaveWheelAt = now;
+      changeSavePage(event.deltaY > 0 ? 1 : -1);
+    }, { passive: false });
+    document.addEventListener("keydown", (event) => {
+      const isCancelKey = event.key === "Escape" || event.key === "0" || event.code === "Numpad0";
+      if (isCancelKey && (uiConfirmDialog.open || settingsDialog.open || endingReplayDialog.open || itemDialog.open || saveDialog.open || historyDialog.open)) {
+        playSystemSound("cancel");
+      }
+      if (screenFadeActive) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+      if (endingActive) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+      if (characterModeActive && !settingsDialog.open) {
+        if (event.key === "Escape" || event.key === "0" || event.code === "Numpad0") {
+          event.preventDefault();
+          playSystemSound("cancel");
+          if (!characterImageViewer.hidden) closeCharacterImageViewer();
+          else closeCharacterModeToBonus();
+        }
+        return;
+      }
+      if (galleryActive && !settingsDialog.open) {
+        if (!galleryViewer.hidden) {
+          if (event.key === "ArrowLeft") { event.preventDefault(); moveGalleryImage(-1); }
+          else if (event.key === "ArrowRight") { event.preventDefault(); moveGalleryImage(1); }
+          else if (event.key === "Escape" || event.key === "0" || event.code === "Numpad0") { event.preventDefault(); closeGalleryViewer(); }
+        }
+        return;
+      }
+      if (musicModeActive && !settingsDialog.open) {
+        if (event.key === "Escape" || event.key === "0" || event.code === "Numpad0") {
+          event.preventDefault();
+          closeMusicModeToTitle();
+        } else if (event.key === " " && musicSelectedIndex >= 0) {
+          event.preventDefault();
+          toggleSelectedMusicPlayback();
+        }
+        return;
+      }
+      if (uiConfirmDialog.open) {
+        if (event.key === "Enter") { event.preventDefault(); closeUiDialog(true); }
+        else if (event.key === "Escape") { event.preventDefault(); closeUiDialog(false); }
+        return;
+      }
+      if (!gameOverScreen.hidden) {
+        event.preventDefault();
+        returnToTitleFromGameOver();
+        return;
+      }
+      if (event.key === "Control" && !endingReplayDialog.open && !historyDialog.open && !settingsDialog.open && !saveDialog.open && !itemDialog.open) {
+        event.preventDefault();
+        setControlSkip(true);
+      }
+      if (historyDialog.open) {
+        if (event.key === "Escape") { event.preventDefault(); closeHistory(); }
+        return;
+      }
+      if (settingsDialog.open) {
+        if (event.key === "0") { event.preventDefault(); settingsDialog.close(); }
+        return;
+      }
+      if (endingReplayDialog.open) {
+        if (event.key === "0" || event.key === "Escape") { event.preventDefault(); endingReplayDialog.close(); }
+        return;
+      }
+      if (itemDialog.open) {
+        if (event.key === "0" || event.key === "Escape") { event.preventDefault(); itemDialog.close(); }
+        return;
+      }
+      if (!saveDialog.open) {
+        if (event.key === "Escape" && window.frames.TEXT && typeof window.frames.TEXT.toggleMessageVisibility === "function") {
+          event.preventDefault();
+          window.frames.TEXT.toggleMessageVisibility();
+        }
+        return;
+      }
+      if (event.key === "0") {
+        event.preventDefault();
+        saveDialog.close();
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        changeSavePage(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        changeSavePage(1);
+      }
+    });
+    document.addEventListener("keyup", (event) => {
+      if (event.key === "Control") setControlSkip(false);
+    });
+    window.addEventListener("blur", () => setControlSkip(false));
+    musicVolume.addEventListener("input", applyAudioSettings);
+    musicMute.addEventListener("change", applyAudioSettings);
+    voiceVolume.addEventListener("input", applyVoiceSettings);
+    voiceMute.addEventListener("change", applyVoiceSettings);
+    systemSoundVolume.addEventListener("input", applySystemSoundSettings);
+    systemSoundMute.addEventListener("change", applySystemSoundSettings);
+    scenarioSoundVolume.addEventListener("input", applyScenarioSoundSettings);
+    scenarioSoundMute.addEventListener("change", applyScenarioSoundSettings);
+    fontSize.addEventListener("input", applyFontSizeSetting);
+    document.querySelectorAll(".mode-button[data-mode]").forEach((button) => {
+      button.addEventListener("click", () => setGameMode(button.dataset.mode));
+    });
+    document.querySelectorAll(".mode-button[data-image-effect]").forEach((button) => {
+      button.addEventListener("click", () => setImageEffects(button.dataset.imageEffect === "on"));
+    });
+    document.querySelectorAll(".mode-button[data-skip-unread]").forEach((button) => {
+      button.addEventListener("click", () => setSkipUnread(button.dataset.skipUnread === "true"));
+    });
+    document.getElementById("returnTitleButton").addEventListener("click", requestReturnToTitle);
+    uiConfirmOk.addEventListener("click", () => closeUiDialog(true));
+    uiConfirmCancel.addEventListener("click", () => closeUiDialog(false));
+    uiConfirmDialog.addEventListener("cancel", (event) => { event.preventDefault(); closeUiDialog(false); });
+    uiConfirmDialog.addEventListener("click", (event) => { if (event.target === uiConfirmDialog) closeUiDialog(false); });
+
+    function showUiDialog({title="確認", message="", confirmText="OK", cancelText="キャンセル", alertOnly=false, soundKind="dialog"}={}) {
+      stopScreenShake();
+      if (uiDialogResolve) closeUiDialog(false);
+      uiConfirmTitle.textContent = title;
+      uiConfirmMessage.textContent = message;
+      uiConfirmOk.textContent = confirmText;
+      uiConfirmCancel.textContent = cancelText;
+      uiConfirmCancel.hidden = alertOnly;
+      uiConfirmDialog.showModal();
+      playSystemSound(soundKind);
+      requestAnimationFrame(() => uiConfirmOk.focus());
+      return new Promise((resolve) => { uiDialogResolve = resolve; });
+    }
+
+    function closeUiDialog(result) {
+      if (!uiConfirmDialog.open) return;
+      uiConfirmDialog.close();
+      const resolve = uiDialogResolve;
+      uiDialogResolve = null;
+      if (resolve) resolve(Boolean(result));
+    }
+
+    function showGameAlert(message, title="お知らせ") {
+      return showUiDialog({title, message, alertOnly:true, soundKind:"error"});
+    }
+
+    function startScreenFade(request) {
+      const fadeMode = typeof request === "object" && request !== null ? Number(request.mode) : Number(request);
+      const requestedDuration = typeof request === "object" && request !== null ? Number(request.duration) : NaN;
+      const fadeBgm = typeof request === "object" && request !== null && request.fadeBgm === true;
+      const fadeLoopingSound = typeof request === "object" && request !== null && request.fadeLoopingSound === true;
+      const duration = Number.isFinite(requestedDuration) && requestedDuration > 0
+        ? Math.max(0.05, Math.min(60, requestedDuration))
+        : 0.55;
+      const fadeMilliseconds = Math.round(duration * 1000);
+      const fadeRequest = {mode: fadeMode === 1 ? 1 : 0, duration, fadeBgm, fadeLoopingSound};
+      if (screenFadeActive) {
+        queuedScreenFade = fadeRequest;
+        return;
+      }
+      screenFadeActive = true;
+      screenFadeAdvanced = false;
+      screenFadePhase = "out";
+      activeScreenFadeRequest = fadeRequest;
+      if (fadeRequest.fadeBgm) fadeOutBgmForScreenFade(fadeMilliseconds);
+      if (fadeRequest.fadeLoopingSound) fadeOutLoopingSoundForScreenFade(fadeMilliseconds);
+      screenFadeOverlay.style.transition = "none";
+      screenFadeOverlay.style.background = fadeRequest.mode === 1 ? "#fff" : "#000";
+      screenFadeOverlay.style.opacity = "0";
+      screenFadeOverlay.hidden = false;
+      void screenFadeOverlay.offsetWidth;
+      screenFadeOverlay.style.transition = `opacity ${duration}s ease`;
+      screenFadeOverlay.style.opacity = "1";
+      screenFadeTimers.push(window.setTimeout(() => {
+        screenFadePhase = "hold";
+        if (activeScreenFadeRequest?.fadeBgm) finishBgmScreenFadeImmediately();
+        if (activeScreenFadeRequest?.fadeLoopingSound) finishLoopingSoundFadeImmediately();
+        advanceScreenFadeScene();
+        screenFadeTimers.push(window.setTimeout(() => {
+          screenFadePhase = "in";
+          screenFadeOverlay.style.opacity = "0";
+          screenFadeTimers.push(window.setTimeout(completeScreenFade, fadeMilliseconds + 20));
+        }, 280));
+      }, fadeMilliseconds + 20));
+    }
+
+    function advanceScreenFadeScene() {
+      if (screenFadeAdvanced) return;
+      screenFadeAdvanced = true;
+      if (exitAfterScreenFade) {
+        exitAfterScreenFade = false;
+        window.frames.sys.returnToTitle(true);
+        return;
+      }
+      const textFrame = window.frames.TEXT;
+      if (textFrame && typeof textFrame.advanceAfterScreenFade === "function") textFrame.advanceAfterScreenFade();
+    }
+
+    function skipScreenFade(event) {
+      if (event) { event.preventDefault(); event.stopPropagation(); }
+      if (!screenFadeActive) return;
+      if (gameOverExitFade || titleStartTransitionActive) return;
+      clearScreenFadeTimers();
+      if (activeScreenFadeRequest?.fadeBgm) finishBgmScreenFadeImmediately();
+      if (activeScreenFadeRequest?.fadeLoopingSound) finishLoopingSoundFadeImmediately();
+      if (screenFadePhase === "in") {
+        screenFadeOverlay.style.transition = "none";
+        screenFadeOverlay.style.opacity = "0";
+        completeScreenFade();
+        return;
+      }
+      // Keep the old presentation completely covered while the scenario and
+      // image layers advance.  Revealing the overlay before that repaint can
+      // expose the pre-fade image for one frame.
+      screenFadePhase = "hold";
+      screenFadeOverlay.style.transition = "none";
+      screenFadeOverlay.style.opacity = "1";
+      void screenFadeOverlay.offsetWidth;
+      advanceScreenFadeScene();
+      const fadeInMilliseconds = Math.round((activeScreenFadeRequest?.duration || 0.55) * 1000);
+      screenFadeTimers.push(window.setTimeout(() => {
+        screenFadePhase = "in";
+        screenFadeOverlay.style.transition = `opacity ${activeScreenFadeRequest?.duration || 0.55}s ease`;
+        screenFadeOverlay.style.opacity = "0";
+        screenFadeTimers.push(window.setTimeout(completeScreenFade, fadeInMilliseconds + 20));
+      }, 120));
+    }
+
+    function clearScreenFadeTimers() {
+      screenFadeTimers.forEach((timer) => window.clearTimeout(timer));
+      screenFadeTimers = [];
+    }
+
+    function completeScreenFade() {
+      clearScreenFadeTimers();
+      screenFadeOverlay.hidden = true;
+      screenFadeOverlay.style.transition = "";
+      screenFadeActive = false;
+      screenFadeAdvanced = false;
+      screenFadePhase = "idle";
+      activeScreenFadeRequest = null;
+      gameOverExitFade = false;
+      if (queuedScreenFade === null) return;
+      const nextFade = queuedScreenFade;
+      queuedScreenFade = null;
+      startScreenFade(nextFade);
+    }
+
+    function startExitToTitle() {
+      if (screenFadeActive) return;
+      exitAfterScreenFade = true;
+      startScreenFade(0);
+    }
+
+    async function requestReturnToTitle() {
+      if (!startScreen.classList.contains("hidden")) return false;
+      const accepted = await showUiDialog({title:"タイトルに戻る",message:"現在の進行状況を終了して、タイトル画面に戻りますか？",confirmText:"タイトルに戻る"});
+      if (!accepted) return false;
+      if (settingsDialog.open) settingsDialog.close();
+      window.frames.sys.returnToTitle(true);
+      return true;
+    }
+
+    function showTitleScreen() {
+      stopScenarioSounds();
+      endingActive = false;
+      activeEndingNumber = null;
+      creditsStarting = false;
+      staffCreditsPromise = null;
+      window.clearTimeout(endingCaptionExitTimer);
+      endingCaptionExitTimer = 0;
+      window.cancelAnimationFrame(creditsAnimationFrame);
+      endingScreen.hidden = true;
+      endingScreen.style.pointerEvents = "";
+      creditsScreen.hidden = true;
+      creditsScreen.classList.remove("complete", "credits-fading-out");
+      stage.classList.remove("ending-background-out", "ending-full-fade");
+      document.getElementById("TEXT").style.visibility = "";
+      if (saveDialog.open) saveDialog.close();
+      if (endingReplayDialog.open) endingReplayDialog.close();
+      if (settingsDialog.open) settingsDialog.close();
+      if (itemDialog.open) itemDialog.close();
+      closeHistory();
+      gameOverScreen.hidden = true;
+      stage.classList.remove("game-over-active");
+      window.bonusMode = false;
+      window.endingReplayMode = false;
+      resetMusicModePlayback();
+      musicModeActive = false;
+      musicScreen.hidden = true;
+      characterModeActive = false;
+      characterScreen.hidden = true;
+      titleMenuPage = "main";
+      galleryActive = false;
+      galleryScreen.hidden = true;
+      galleryViewer.hidden = true;
+      document.querySelector(".toolbar").style.visibility = "";
+      startScreen.classList.remove("hidden");
+      startScreen.classList.remove("title-revealing");
+      void startScreen.offsetWidth;
+      startScreen.classList.add("title-revealing");
+      renderHiddenHotspotDebugLayer();
+      setStoryUiBlocked(false);
+      updateTitleMenuState();
+      playTitleBgm();
+    }
+
+    function hideTitleScreen() {
+      closeHiddenImage();
+      startScreen.classList.add("hidden");
+      startScreen.classList.remove("title-revealing");
+      if (requestedBgm === "title.mid") stopBgm();
+      updateTitleMenuState();
+    }
+
+    async function loadHiddenImageDefinitions() {
+      hiddenImageDefinitions = [];
+      hiddenImageDebugEnabled = false;
+      try {
+        const response = await fetch("scenario/hidden.txt", {cache:"no-store"});
+        if (!response.ok) return;
+        const entries = [];
+        (await response.text()).replace(/^\uFEFF/, "").split(/\r?\n/).forEach((source, index) => {
+          const line = source.trim();
+          if (!line || line.startsWith("#")) return;
+          if (/^@debug\s+(on|off)$/i.test(line)) {
+            hiddenImageDebugEnabled = /\son$/i.test(line);
+            return;
+          }
+          const match = line.match(/^(\d+(?:\.\d+)?),(\d+(?:\.\d+)?)\s+([^\s\\/]+)$/);
+          if (!match) {
+            console.warn(`scenario/hidden.txt ${index + 1}行目を読み飛ばしました: ${source}`);
+            return;
+          }
+          const x = Number(match[1]);
+          const y = Number(match[2]);
+          if (x < 0 || x > 1600 || y < 0 || y > 900 || match[3].includes("..")) {
+            console.warn(`scenario/hidden.txt ${index + 1}行目の座標またはファイル名が不正です: ${source}`);
+            return;
+          }
+          entries.push({x, y, file:match[3].replace(/\.jpg$/i, "")});
+        });
+        hiddenImageDefinitions = entries;
+        renderHiddenHotspotDebugLayer();
+      } catch (error) {
+        console.warn("隠し画像設定を読み込めませんでした", error);
+      }
+    }
+
+    function renderHiddenHotspotDebugLayer() {
+      hiddenHotspotDebugLayer.replaceChildren();
+      hiddenHotspotDebugLayer.hidden = !hiddenTitleFeatureUnlocked() || !hiddenImageDebugEnabled || !hiddenImageDefinitions.length;
+      if (hiddenHotspotDebugLayer.hidden) return;
+      hiddenImageDefinitions.forEach((entry) => {
+        const marker = document.createElement("div");
+        marker.className = "hidden-hotspot-marker";
+        marker.style.left = `${entry.x / 16}%`;
+        marker.style.top = `${entry.y / 9}%`;
+        const label = document.createElement("span");
+        label.className = "hidden-hotspot-label";
+        label.textContent = `${entry.x},${entry.y}  ${entry.file}.jpg`;
+        marker.append(label);
+        hiddenHotspotDebugLayer.append(marker);
+      });
+    }
+
+    function handleHiddenTitlePoint(event) {
+      if (startScreen.classList.contains("hidden") || !hiddenImageViewer.hidden) return;
+      if (event.target.closest("button")) return;
+      if (isNekomimiTogglePoint(event.clientX, event.clientY)) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleNekomimiMode();
+        return;
+      }
+      if (!hiddenTitleFeatureUnlocked()) return;
+      const match = findHiddenTitlePoint(event.clientX, event.clientY);
+      if (!match) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const source = new URL(`resource/remake/jpg/${encodeURIComponent(match.file)}.jpg`, location.href);
+      source.searchParams.set("v", window.sceneAssetVersion);
+      hiddenImage.src = source.href;
+      hiddenImageViewer.hidden = false;
+      hiddenImageViewer.focus?.({preventScroll:true});
+    }
+
+    function findHiddenTitlePoint(clientX, clientY) {
+      if (!hiddenTitleFeatureUnlocked()) return null;
+      const bounds = startScreen.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return null;
+      const pointX = (clientX - bounds.left) / bounds.width * 1600;
+      const pointY = (clientY - bounds.top) / bounds.height * 900;
+      const radiusX = Math.max(32, 26 / bounds.width * 1600);
+      const radiusY = Math.max(32, 26 / bounds.height * 900);
+      return hiddenImageDefinitions
+        .map((entry) => ({entry, distance:Math.hypot((pointX - entry.x) / radiusX, (pointY - entry.y) / radiusY)}))
+        .filter((candidate) => candidate.distance <= 1)
+        .sort((left, right) => left.distance - right.distance)[0]?.entry || null;
+    }
+
+    function updateHiddenTitleCursor(event) {
+      if (event.pointerType === "touch" || !hiddenImageViewer.hidden || event.target.closest("button")) {
+        clearHiddenTitleCursor();
+        return;
+      }
+      startScreen.classList.toggle("hidden-hotspot", isNekomimiTogglePoint(event.clientX, event.clientY)
+        || Boolean(findHiddenTitlePoint(event.clientX, event.clientY)));
+    }
+
+    function clearHiddenTitleCursor() {
+      startScreen.classList.remove("hidden-hotspot");
+    }
+
+    function hiddenTitleFeatureUnlocked() {
+      return hasEndingAchievement(1);
+    }
+
+    function isNekomimiTogglePoint(clientX, clientY) {
+      if (!hasAnyEndingAchievement()) return false;
+      const bounds = startScreen.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return false;
+      const margin = 24;
+      return clientX >= bounds.right - margin && clientX <= bounds.right
+        && clientY >= bounds.bottom - margin && clientY <= bounds.bottom;
+    }
+
+    function toggleNekomimiMode() {
+      window.nekomimiMode = !window.nekomimiMode;
+      updateNekomimiTitle();
+      clearHiddenTitleCursor();
+      void showUiDialog({
+        title:"ねこみみモード",
+        message:`ねこみみモードを${window.nekomimiMode ? "ON" : "OFF"}にしました。`,
+        confirmText:"OK",
+        alertOnly:true
+      });
+    }
+
+    function transformNekomimiText(value) {
+      const text = String(value ?? "");
+      return window.nekomimiMode ? text.replace(/時(?!計|間|代|空)/g, "猫") : text;
+    }
+    window.transformNekomimiText = transformNekomimiText;
+
+    function updateNekomimiTitle() {
+      const main = document.getElementById("titleMainText");
+      const sub = document.getElementById("titleSubText");
+      document.title = window.nekomimiMode ? "猫の封土" : "時の封土";
+      if (main) main.textContent = window.nekomimiMode ? "猫の封土" : "時の封土";
+      if (sub) sub.textContent = window.nekomimiMode ? "THE SEAL OF CAT" : "THE SEAL OF TIME";
+    }
+
+    function closeHiddenImage(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      hiddenImageViewer.hidden = true;
+      hiddenImage.removeAttribute("src");
+      clearHiddenTitleCursor();
+    }
+
+    function wait(milliseconds) {
+      return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+    }
+
+    async function startNewGameTransition(startScene, startPosition = 0, options = {}) {
+      if (titleStartTransitionActive || screenFadeActive) return;
+      titleStartTransitionActive = true;
+      screenFadeActive = true;
+      screenFadeOverlay.style.transition = "none";
+      screenFadeOverlay.style.background = "#000";
+      screenFadeOverlay.style.opacity = "0";
+      screenFadeOverlay.hidden = false;
+      void screenFadeOverlay.offsetWidth;
+      screenFadeOverlay.style.transition = "opacity 1.15s ease";
+
+      const musicFade = fadeOutTitleBgm(1100);
+      requestAnimationFrame(() => { screenFadeOverlay.style.opacity = "1"; });
+      await Promise.all([musicFade, wait(1180)]);
+
+      window.frames.sys.init();
+      window.bonusMode = false;
+      window.endingReplayMode = options.endingReplay === true;
+      hideTitleScreen();
+      window.frames.sys.goit(Number(startScene) || 0, Number(startPosition) || 0);
+
+      await wait(180);
+      screenFadeOverlay.style.transition = "opacity .75s ease";
+      screenFadeOverlay.style.opacity = "0";
+      await wait(780);
+      screenFadeOverlay.hidden = true;
+      screenFadeOverlay.style.transition = "";
+      screenFadeActive = false;
+      screenFadeAdvanced = false;
+      titleStartTransitionActive = false;
+    }
+
+    function playTitleBgm() {
+      if (!audioPlaybackAllowed || startScreen.classList.contains("hidden")) return;
+      playBgm("title.mid");
+    }
+
+    async function resumeTitleBgmAfterInteraction(event) {
+      if (!audioPlaybackAllowed || startScreen.classList.contains("hidden") || !bgmPlayer.paused) return;
+      if (event?.target?.closest?.("#startButton, #bonusButton, #afterwordButton, #specialAppendixButton, #galleryButton, #musicModeButton, #characterButton, #titleMenuBackButton, .ending-replay-entry")) return;
+      await unlockAudio();
+      if (!startScreen.classList.contains("hidden")) playTitleBgm();
+    }
+
+    function updateTitleMenuState() {
+      const atTitle = !startScreen.classList.contains("hidden");
+      const replayingEnding = window.endingReplayMode;
+      const endingSeen = localStorage.getItem("Time2:EndingSeen") === "true";
+      const allEndingsSeen = hasAllEndingAchievements();
+      const inBonusTitleMenu = atTitle && titleMenuPage === "bonus";
+      const startButton = document.getElementById("startButton");
+      const continueButton = document.getElementById("continueButton");
+      const saveButton = window.frames.sys?.document?.querySelector("[data-menu-save]");
+      const loadButton = window.frames.sys?.document?.querySelector("[data-menu-load]");
+      const skipButton = window.frames.sys?.document?.querySelector("[data-skip-button]");
+      const historyButton = window.frames.sys?.document?.querySelector("[data-menu-history]");
+      const itemButton = window.frames.sys?.document?.querySelector("[data-menu-items]");
+      const settingsButton = window.frames.sys?.document?.querySelector("[data-menu-settings]");
+      if (saveButton) saveButton.hidden = galleryActive || musicModeActive || characterModeActive || atTitle || window.bonusMode || replayingEnding;
+      if (loadButton) loadButton.hidden = galleryActive || musicModeActive || characterModeActive || window.bonusMode || replayingEnding;
+      if (skipButton) skipButton.hidden = galleryActive || musicModeActive || characterModeActive || atTitle;
+      if (historyButton) historyButton.hidden = galleryActive || musicModeActive || characterModeActive || atTitle;
+      if (itemButton) itemButton.hidden = galleryActive || musicModeActive || characterModeActive || atTitle || window.bonusMode || replayingEnding || saveDialog.open || settingsDialog.open || itemDialog.open;
+      if (settingsButton) settingsButton.textContent = "設定";
+      document.getElementById("returnTitleButton").disabled = atTitle;
+      startButton.hidden = inBonusTitleMenu;
+      continueButton.hidden = inBonusTitleMenu;
+      endingReplayButton.hidden = !inBonusTitleMenu || !endingSeen;
+      bonusButton.hidden = !atTitle || inBonusTitleMenu || !endingSeen;
+      afterwordButton.hidden = !inBonusTitleMenu || !endingSeen;
+      specialAppendixButton.hidden = !inBonusTitleMenu || !allEndingsSeen;
+      galleryButton.hidden = !inBonusTitleMenu || !endingSeen;
+      musicModeButton.hidden = !inBonusTitleMenu || !endingSeen;
+      characterButton.hidden = !inBonusTitleMenu || !endingSeen;
+      titleMenuBackButton.hidden = !inBonusTitleMenu;
+    }
+
+    function showBonusTitleMenu() {
+      if (localStorage.getItem("Time2:EndingSeen") !== "true") return;
+      titleMenuPage = "bonus";
+      updateTitleMenuState();
+    }
+
+    function showMainTitleMenu() {
+      titleMenuPage = "main";
+      updateTitleMenuState();
+    }
+
+    async function loadGalleryDefinitions() {
+      if (galleryDefinitions.length) return galleryDefinitions;
+      const response = await fetch("scenario/gallery.txt", {cache:"no-store"});
+      if (!response.ok) throw new Error(`ギャラリー定義を読み込めません (${response.status})`);
+      const definitions = [];
+      (await response.text()).replace(/^\uFEFF/, "").replace(/\r/g, "").split("\n").forEach((source, index) => {
+        const line = source.trim();
+        if (!line || line.startsWith("#")) return;
+        const match = line.match(/^(c\d{1,2})[ \t]+([^ \t]+)[ \t]+(.+)$/i);
+        if (!match) throw new Error(`scenario/gallery.txt:${index + 1}: 定義形式が不正です`);
+        definitions.push({flag:`c${String(Number(match[1].slice(1))).padStart(2,"0")}`, image:match[2], title:match[3].trim()});
+      });
+      galleryDefinitions = definitions;
+      return definitions;
+    }
+
+    function isGalleryEntryUnlocked(entry) {
+      return localStorage.getItem(`Time2:GalleryFlag:${entry.flag}`) === "1";
+    }
+
+    async function resolveGalleryImage(entry) {
+      const candidates = window.gameMode === "remake"
+        ? [
+            ...(window.nekomimiMode ? [`resource/remake/njpg/${entry.image}.jpg`] : []),
+            `resource/remake/jpg/${entry.image}.jpg`,
+            `resource/original/jpg/${entry.image}.jpg`
+          ]
+        : [`resource/original/jpg/${entry.image}.jpg`];
+      for (const candidate of candidates) {
+        const url = new URL(candidate, location.href);
+        url.searchParams.set("v", window.sceneAssetVersion);
+        if (await assetExists(url.href)) return url.href;
+      }
+      return "";
+    }
+
+    async function openGallery() {
+      if (galleryActive || localStorage.getItem("Time2:EndingSeen") !== "true") return;
+      try { await loadGalleryDefinitions(); }
+      catch (error) { await showGameAlert(error.message, "ギャラリーエラー"); return; }
+      galleryActive = true;
+      galleryCurrentIndex = -1;
+      startScreen.classList.add("hidden");
+      startScreen.classList.remove("title-revealing");
+      galleryViewer.hidden = true;
+      galleryScreen.hidden = false;
+      document.querySelector(".toolbar").style.visibility = "";
+      updateTitleMenuState();
+      playBgm("globalskip");
+      await renderGalleryGrid();
+    }
+
+    async function renderGalleryGrid() {
+      const renderGeneration = ++galleryRenderGeneration;
+      galleryGrid.replaceChildren();
+      const cards = await Promise.all(galleryDefinitions.map(async (entry, index) => {
+        const unlocked = isGalleryEntryUnlocked(entry);
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "gallery-card";
+        card.disabled = !unlocked;
+        const imageUrl = unlocked ? await resolveGalleryImage(entry) : "";
+        if (imageUrl) {
+          const image = document.createElement("img");
+          image.className = "gallery-thumb";
+          image.src = imageUrl;
+          image.alt = "";
+          card.append(image);
+        } else {
+          const locked = document.createElement("span");
+          locked.className = "gallery-thumb locked";
+          card.append(locked);
+        }
+        const title = document.createElement("span");
+        title.className = "gallery-card-title";
+        title.textContent = unlocked ? transformNekomimiText(entry.title) : "？？？";
+        card.append(title);
+        if (unlocked) card.addEventListener("click", () => openGalleryViewer(index));
+        return card;
+      }));
+      if (renderGeneration !== galleryRenderGeneration) return;
+      galleryGrid.append(...cards);
+    }
+
+    async function openGalleryViewer(index) {
+      if (!galleryDefinitions.length) return;
+      galleryCurrentIndex = (index + galleryDefinitions.length) % galleryDefinitions.length;
+      galleryViewer.hidden = false;
+      await renderGalleryViewer();
+    }
+
+    function closeGalleryViewer() {
+      galleryViewer.hidden = true;
+      galleryImage.hidden = true;
+      galleryImage.removeAttribute("src");
+      galleryCurrentIndex = -1;
+    }
+
+    async function moveGalleryImage(direction) {
+      if (galleryViewer.hidden || !galleryDefinitions.length) return;
+      galleryCurrentIndex = (galleryCurrentIndex + direction + galleryDefinitions.length) % galleryDefinitions.length;
+      await renderGalleryViewer();
+    }
+
+    async function renderGalleryViewer() {
+      const requestedIndex = galleryCurrentIndex;
+      const requestedMode = window.gameMode;
+      const entry = galleryDefinitions[requestedIndex];
+      const unlocked = isGalleryEntryUnlocked(entry);
+      galleryViewerTitle.textContent = unlocked ? transformNekomimiText(entry.title) : "？？？";
+      const imageUrl = unlocked ? await resolveGalleryImage(entry) : "";
+      if (requestedIndex !== galleryCurrentIndex || requestedMode !== window.gameMode) return;
+      if (imageUrl) {
+        galleryImage.src = imageUrl;
+        galleryImage.alt = entry.title;
+        galleryImage.hidden = false;
+      } else {
+        galleryImage.hidden = true;
+        galleryImage.removeAttribute("src");
+      }
+    }
+
+    function closeGalleryToTitle() {
+      if (!galleryActive) return;
+      galleryActive = false;
+      galleryScreen.hidden = true;
+      galleryViewer.hidden = true;
+      showTitleScreen();
+    }
+
+    async function loadCharacterDefinitions() {
+      const response = await fetch("scenario/characters.txt", {cache:"no-store"});
+      if (!response.ok) throw new Error(`キャラクター定義を読み込めません (${response.status})`);
+      const definitions = [];
+      (await response.text()).replace(/^\uFEFF/, "").replace(/\r/g, "").split("\n").forEach((source, index) => {
+        if (!source.trim() || source.trimStart().startsWith("#")) return;
+        const fields = source.split("\t");
+        const name = (fields.shift() || "").trim();
+        const image = (fields.shift() || "").trim();
+        const description = (fields.shift() || "").trim().replace(/\\n/g, "\n");
+        const quote = (fields.shift() || "").trim().replace(/\\n/g, "\n");
+        const voice = (fields.shift() || "").trim();
+        const unlockFlag = (fields.shift() || "").trim().toLowerCase();
+        if (!name || !image) throw new Error(`scenario/characters.txt:${index + 1}: 名前または画像ファイル名がありません`);
+        if (/[/\\]/.test(image)) throw new Error(`scenario/characters.txt:${index + 1}: 画像ファイル名にフォルダは指定できません`);
+        if (unlockFlag && !/^s(?:0?[0-9]|[1-9][0-9])$/.test(unlockFlag)) throw new Error(`scenario/characters.txt:${index + 1}: 解放システムフラグが不正です`);
+        definitions.push({name, image, description, quote, voice:voice === "-" ? "" : voice.replace(/\.mp3$/i, ""), unlockFlag});
+      });
+      if (!definitions.length) throw new Error("scenario/characters.txtにキャラクターが登録されていません");
+      characterDefinitions = definitions;
+      return definitions;
+    }
+
+    async function openCharacterMode() {
+      if (characterModeActive || localStorage.getItem("Time2:EndingSeen") !== "true") return;
+      try { await loadCharacterDefinitions(); }
+      catch (error) { await showGameAlert(error.message, "キャラクター紹介エラー"); return; }
+      characterModeActive = true;
+      characterSelectedIndex = -1;
+      galleryActive = false;
+      musicModeActive = false;
+      galleryScreen.hidden = true;
+      musicScreen.hidden = true;
+      startScreen.classList.add("hidden");
+      startScreen.classList.remove("title-revealing");
+      characterScreen.hidden = false;
+      document.querySelector(".toolbar").style.visibility = "";
+      renderCharacterList();
+      clearCharacterDetail();
+      updateTitleMenuState();
+      const firstVisible = characterDefinitions.findIndex(isCharacterUnlocked);
+      if (firstVisible >= 0) selectCharacter(firstVisible);
+    }
+
+    function isCharacterUnlocked(entry) {
+      if (!entry?.unlockFlag) return true;
+      const normalized = `s${String(Number(entry.unlockFlag.slice(1))).padStart(2,"0")}`;
+      return localStorage.getItem(`Time2:SystemFlag:${normalized}`) === "1";
+    }
+
+    function renderCharacterList() {
+      characterList.replaceChildren();
+      characterDefinitions.forEach((entry, index) => {
+        if (!isCharacterUnlocked(entry)) return;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "character-entry";
+        button.classList.toggle("selected", index === characterSelectedIndex);
+        button.textContent = transformNekomimiText(entry.name);
+        button.addEventListener("click", () => selectCharacter(index));
+        characterList.append(button);
+      });
+    }
+
+    function selectCharacter(index) {
+      const entry = characterDefinitions[index];
+      if (!entry) return;
+      closeCharacterImageViewer();
+      stopVoice();
+      characterSelectedIndex = index;
+      renderCharacterList();
+      characterName.textContent = transformNekomimiText(entry.name);
+      characterDescription.textContent = transformNekomimiText(entry.description);
+      characterQuoteArea.replaceChildren();
+      if (entry.quote) {
+        const quote = document.createElement(entry.voice ? "button" : "blockquote");
+        if (entry.voice) quote.type = "button";
+        quote.className = "character-quote";
+        quote.textContent = `「${transformNekomimiText(entry.quote)}」`;
+        if (entry.voice) {
+          quote.title = "クリックするとボイスを再生します";
+          quote.addEventListener("click", () => playVoice(entry.voice));
+        }
+        characterQuoteArea.append(quote);
+      }
+      characterEmpty.hidden = true;
+      characterImage.hidden = false;
+      characterImage.alt = transformNekomimiText(entry.name);
+      const imageUrl = new URL(`character/${entry.image.split("/").map(encodeURIComponent).join("/")}`, location.href);
+      imageUrl.searchParams.set("v", window.sceneAssetVersion);
+      characterImage.src = imageUrl.href;
+      characterImage.onerror = () => {
+        if (characterSelectedIndex !== index) return;
+        characterImage.hidden = true;
+        characterEmpty.hidden = false;
+        characterEmpty.textContent = transformNekomimiText(`画像を読み込めません：${entry.image}`);
+      };
+    }
+
+    function clearCharacterDetail() {
+      stopVoice();
+      closeCharacterImageViewer();
+      characterImage.hidden = true;
+      characterImage.removeAttribute("src");
+      characterEmpty.hidden = false;
+      characterEmpty.textContent = "名前を選択してください";
+      characterName.textContent = "";
+      characterDescription.textContent = "";
+      characterQuoteArea.replaceChildren();
+    }
+
+    function openCharacterImageViewer() {
+      if (!characterModeActive || characterImage.hidden || !characterImage.currentSrc) return;
+      characterImageExpanded.src = characterImage.currentSrc;
+      characterImageExpanded.alt = characterImage.alt;
+      characterImageViewer.hidden = false;
+      characterImageViewer.focus({preventScroll:true});
+    }
+
+    function closeCharacterImageViewer() {
+      if (characterImageViewer.hidden) return;
+      characterImageViewer.hidden = true;
+      characterImageExpanded.removeAttribute("src");
+      characterImageExpanded.alt = "";
+    }
+
+    function closeCharacterModeToBonus() {
+      if (!characterModeActive) return;
+      clearCharacterDetail();
+      characterModeActive = false;
+      characterScreen.hidden = true;
+      startScreen.classList.remove("hidden");
+      startScreen.classList.remove("title-revealing");
+      titleMenuPage = "bonus";
+      updateTitleMenuState();
+      playTitleBgm();
+    }
+
+    async function loadMusicDefinitions() {
+      const response = await fetch("scenario/music.txt", {cache:"no-store"});
+      if (!response.ok) throw new Error(`音楽定義を読み込めません (${response.status})`);
+      const definitions = [];
+      (await response.text()).replace(/^\uFEFF/, "").replace(/\r/g, "").split("\n").forEach((source, index) => {
+        if (!source.trim() || source.trimStart().startsWith("#")) return;
+        const fields = source.split("\t");
+        const file = (fields.shift() || "").trim();
+        const title = (fields.shift() || "").trim();
+        const creator = (fields.shift() || "").trim();
+        const description = fields.join("\t").trim();
+        if (!file || !/\.mp3$/i.test(file)) throw new Error(`scenario/music.txt:${index + 1}: MP3ファイル名が不正です`);
+        definitions.push({file, title, creator, description});
+      });
+      if (!definitions.length) throw new Error("scenario/music.txtに曲が登録されていません");
+      musicDefinitions = definitions;
+      return definitions;
+    }
+
+    function musicDisplayTitle(entry) {
+      return transformNekomimiText(entry?.title || entry?.file?.replace(/\.mp3$/i, "") || "");
+    }
+
+    function musicFileUrl(entry) {
+      return new URL(`mp3/${entry.file.split("/").map(encodeURIComponent).join("/")}`, location.href).href;
+    }
+
+    async function openMusicMode() {
+      if (musicModeActive || localStorage.getItem("Time2:EndingSeen") !== "true") return;
+      try { await loadMusicDefinitions(); }
+      catch (error) { await showGameAlert(error.message, "音楽モードエラー"); return; }
+      resetMusicModePlayback();
+      musicModeActive = true;
+      galleryActive = false;
+      galleryScreen.hidden = true;
+      startScreen.classList.add("hidden");
+      startScreen.classList.remove("title-revealing");
+      musicScreen.hidden = false;
+      document.querySelector(".toolbar").style.visibility = "";
+      renderMusicMode();
+      updateTitleMenuState();
+      void fadeOutTitleBgm(650);
+    }
+
+    function closeMusicModeToTitle() {
+      if (!musicModeActive) return;
+      resetMusicModePlayback();
+      musicModeActive = false;
+      musicScreen.hidden = true;
+      showTitleScreen();
+    }
+
+    function resetMusicModePlayback() {
+      musicModePlayer.pause();
+      musicModePlayer.removeAttribute("src");
+      musicModePlayer.load();
+      musicSelectedIndex = -1;
+      musicPlayingIndex = -1;
+      if (musicList) musicList.replaceChildren();
+      updateMusicPlayerDisplay();
+    }
+
+    function renderMusicMode() {
+      musicList.replaceChildren();
+      musicDefinitions.forEach((entry, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "music-entry";
+        button.classList.toggle("selected", index === musicSelectedIndex);
+        button.setAttribute("role", "option");
+        button.setAttribute("aria-selected", String(index === musicSelectedIndex));
+        const mark = document.createElement("span");
+        mark.className = "music-state-mark";
+        if (index === musicPlayingIndex && !musicModePlayer.ended) mark.textContent = musicModePlayer.paused ? "Ⅱ" : "▶";
+        const title = document.createElement("span");
+        title.className = "music-entry-title";
+        title.textContent = musicDisplayTitle(entry);
+        button.append(mark, title);
+        button.addEventListener("click", () => selectMusicEntry(index));
+        musicList.append(button);
+      });
+      updateMusicPlayerDisplay();
+    }
+
+    function selectMusicEntry(index) {
+      if (index < 0 || index >= musicDefinitions.length) return;
+      if (musicSelectedIndex === index) {
+        void playSelectedMusic();
+        return;
+      }
+      musicSelectedIndex = index;
+      renderMusicMode();
+    }
+
+    async function playSelectedMusic() {
+      if (musicSelectedIndex < 0 || !musicDefinitions[musicSelectedIndex]) return;
+      if (musicPlayingIndex === musicSelectedIndex) {
+        if (!musicModePlayer.paused && !musicModePlayer.ended) return;
+        if (musicModePlayer.ended) musicModePlayer.currentTime = 0;
+      } else {
+        musicModePlayer.pause();
+        musicPlayingIndex = musicSelectedIndex;
+        musicModePlayer.src = musicFileUrl(musicDefinitions[musicPlayingIndex]);
+        musicModePlayer.loop = false;
+        musicModePlayer.load();
+      }
+      musicModePlayer.volume = currentMusicVolume();
+      try { await musicModePlayer.play(); }
+      catch (error) {
+        musicNowPlaying.textContent = "この曲を再生できませんでした";
+      }
+      renderMusicMode();
+    }
+
+    function toggleSelectedMusicPlayback() {
+      if (musicSelectedIndex < 0) return;
+      if (musicPlayingIndex === musicSelectedIndex && !musicModePlayer.paused && !musicModePlayer.ended) {
+        musicModePlayer.pause();
+        renderMusicMode();
+        return;
+      }
+      void playSelectedMusic();
+    }
+
+    function formatMusicTime(value) {
+      if (!Number.isFinite(value) || value < 0) return "0:00";
+      const whole = Math.floor(value);
+      return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+    }
+
+    function updateMusicPlayerDisplay() {
+      const selected = musicDefinitions[musicSelectedIndex];
+      const playing = musicDefinitions[musicPlayingIndex];
+      musicSelectedTitle.textContent = selected ? musicDisplayTitle(selected) : "曲を選択してください";
+      musicSelectedCreator.textContent = selected?.creator ? `制作者：${selected.creator}` : "";
+      musicSelectedDescription.textContent = transformNekomimiText(selected?.description || "");
+      if (!playing) musicNowPlaying.textContent = "停止中";
+      else if (musicModePlayer.ended) musicNowPlaying.textContent = `${musicDisplayTitle(playing)}：再生終了`;
+      else if (musicModePlayer.paused) musicNowPlaying.textContent = `${musicDisplayTitle(playing)}：一時停止中`;
+      else musicNowPlaying.textContent = `再生中：${musicDisplayTitle(playing)}`;
+      const duration = Number.isFinite(musicModePlayer.duration) ? musicModePlayer.duration : 0;
+      const current = Number.isFinite(musicModePlayer.currentTime) ? musicModePlayer.currentTime : 0;
+      musicProgress.max = String(duration);
+      musicProgress.value = String(Math.min(current, duration));
+      musicProgress.disabled = !playing || duration <= 0;
+      musicCurrentTime.textContent = formatMusicTime(current);
+      musicTotalTime.textContent = formatMusicTime(duration);
+      musicPlayButton.disabled = !selected;
+      musicPlayButton.textContent = selected && musicPlayingIndex === musicSelectedIndex && !musicModePlayer.paused && !musicModePlayer.ended ? "一時停止" : "再生";
+    }
+
+    musicModePlayer.addEventListener("loadedmetadata", updateMusicPlayerDisplay);
+    musicModePlayer.addEventListener("durationchange", updateMusicPlayerDisplay);
+    musicModePlayer.addEventListener("timeupdate", updateMusicPlayerDisplay);
+    musicModePlayer.addEventListener("play", renderMusicMode);
+    musicModePlayer.addEventListener("pause", renderMusicMode);
+    musicModePlayer.addEventListener("ended", renderMusicMode);
+    musicModePlayer.addEventListener("error", () => {
+      if (musicModeActive) musicNowPlaying.textContent = "この曲を再生できませんでした";
+    });
+
+    function endingSystemFlagKey(number) {
+      return `Time2:SystemFlag:s${String(90 + number).padStart(2, "0")}`;
+    }
+
+    function hasEndingAchievement(number) {
+      return localStorage.getItem(endingSystemFlagKey(number)) === "1";
+    }
+
+    function hasAnyEndingAchievement() {
+      return endingReplayDefinitions.some((ending) => hasEndingAchievement(ending.number));
+    }
+
+    function hasAllEndingAchievements() {
+      return endingReplayDefinitions.every((ending) => hasEndingAchievement(ending.number));
+    }
+
+    function openEndingReplayDialog() {
+      if (!hasAnyEndingAchievement()) return;
+      endingReplayList.replaceChildren();
+      endingReplayDefinitions.forEach((ending) => {
+        const unlocked = hasEndingAchievement(ending.number);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "ending-replay-entry";
+        button.disabled = !unlocked;
+        const number = document.createElement("span");
+        number.className = "ending-replay-number";
+        number.textContent = `Ending ${String(ending.number).padStart(2, "0")}`;
+        const title = document.createElement("span");
+        title.textContent = unlocked ? transformNekomimiText(ending.title) : "？？？？？";
+        button.append(number, title);
+        if (unlocked) button.addEventListener("click", () => startEndingReplay(ending));
+        endingReplayList.append(button);
+      });
+      endingReplayDialog.showModal();
+      playSystemSound("dialog");
+    }
+
+    async function startEndingReplay(ending) {
+      if (!ending || !hasEndingAchievement(ending.number) || titleStartTransitionActive) return;
+      endingReplayDialog.close();
+      await startNewGameTransition(9, ending.position, {endingReplay:true});
+    }
+
+    async function startBonusMode() {
+      if (localStorage.getItem("Time2:EndingSeen") !== "true") return;
+      startBonusScenario(10);
+    }
+
+    async function startSpecialAppendixMode() {
+      if (!hasAllEndingAchievements()) return;
+      startBonusScenario(11);
+    }
+
+    function startBonusScenario(sceneNumber) {
+      window.frames.sys.init();
+      window.frames.sys.flag_on(99);
+      applyLastEndingFlags(window.lastEndingNumber);
+      window.bonusMode = true;
+      window.endingReplayMode = false;
+      hideTitleScreen();
+      window.frames.sys.goit(sceneNumber, 0);
+    }
+
+    function applyLastEndingFlags(number) {
+      const sysFrame = window.frames.sys;
+      [70, 71, 72, 73, 90].forEach((flag) => sysFrame.flag_off(flag));
+      if (number === 1) { sysFrame.flag_on(73); sysFrame.flag_on(90); }
+      if (number === 2) sysFrame.flag_on(71);
+      if (number === 3) sysFrame.flag_on(73);
+      if (number === 4) sysFrame.flag_on(70);
+      if (number === 5) sysFrame.flag_on(72);
+    }
+
+    function showSceneTitle(name) {
+      if (!name) return;
+      sceneTitleCard.textContent = transformNekomimiText(name);
+      sceneTitleCard.classList.remove("show");
+      void sceneTitleCard.offsetWidth;
+      sceneTitleCard.classList.add("show");
+    }
+
+    function startEnding(number, title) {
+      if (endingActive) return;
+      endingActive = true;
+      creditsStarting = false;
+      window.clearTimeout(endingCaptionExitTimer);
+      endingCaptionExitTimer = 0;
+      window.cancelAnimationFrame(creditsAnimationFrame);
+      endingScreen.style.pointerEvents = "";
+      creditsScreen.hidden = true;
+      creditsScreen.classList.remove("complete", "credits-fading-out");
+      stage.classList.remove("ending-background-out", "ending-full-fade");
+      staffCreditsPromise = loadStaffCredits();
+      creditsComplete = false;
+      const parsedEndingNumber = Number(number);
+      const displayedEndingNumber = Number.isInteger(parsedEndingNumber)
+        ? Math.max(0, Math.min(99, parsedEndingNumber))
+        : 0;
+      activeEndingNumber = displayedEndingNumber;
+      if (displayedEndingNumber === 0) {
+        localStorage.setItem("Time2:SystemFlag:s90", "1");
+      }
+      const updatesLastEnding = displayedEndingNumber >= 1 && displayedEndingNumber <= 5;
+      if (!window.endingReplayMode) {
+        localStorage.setItem("Time2:EndingSeen", "true");
+        window.frames.sys.flag_on(99);
+        if (updatesLastEnding) {
+          window.lastEndingNumber = displayedEndingNumber;
+          localStorage.setItem("Time2:LastEnding", String(window.lastEndingNumber));
+        }
+      }
+      stopAllSkip();
+      stopVoice();
+      document.getElementById("TEXT").style.visibility = "hidden";
+      document.querySelector(".toolbar").style.visibility = "hidden";
+      document.getElementById("endingNumber").textContent = `Ending ${String(displayedEndingNumber).padStart(2, "0")}`;
+      document.getElementById("endingTitle").textContent = transformNekomimiText(title);
+      const caption = endingScreen.querySelector(".ending-caption");
+      caption.style.animation = "none";
+      void caption.offsetWidth;
+      caption.style.animation = "";
+      endingScreen.hidden = false;
+      setStoryUiBlocked(true);
+      endingScreen.focus({preventScroll:true});
+    }
+
+    async function beginCredits() {
+      if (!endingActive || endingScreen.hidden || creditsStarting || !creditsScreen.hidden) return;
+      creditsStarting = true;
+      endingScreen.style.pointerEvents = "none";
+      try {
+        const credits = await (staffCreditsPromise || loadStaffCredits());
+        staffCreditsPromise = null;
+        if (!endingActive) return;
+        renderCredits(credits);
+        creditsScreen.hidden = false;
+        stage.classList.add("ending-background-out");
+        startCreditsScroll();
+        window.clearTimeout(endingCaptionExitTimer);
+        endingCaptionExitTimer = window.setTimeout(() => {
+          endingScreen.hidden = true;
+          endingScreen.style.pointerEvents = "";
+          endingCaptionExitTimer = 0;
+        }, 5050);
+      } catch (error) {
+        console.error("スタッフロールの開始に失敗しました", error);
+        endingScreen.style.pointerEvents = "";
+      } finally {
+        creditsStarting = false;
+      }
+    }
+
+    async function loadStaffCredits() {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 8000);
+      try {
+        const response = await fetch("scenario/staff-roll.txt", {cache:"no-store", signal:controller.signal});
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const credits = parseStaffCredits(await response.text());
+        if (!credits.length) throw new Error("スタッフロール項目がありません");
+        if (!credits.some((credit) => credit.final)) credits[credits.length - 1].final = true;
+        return credits;
+      } catch (error) {
+        console.error("スタッフロールを読み込めませんでした", error);
+        return [{role:"スタッフロール", name:"staff-roll.txt を読み込めませんでした", final:true}];
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    }
+
+    function parseStaffCredits(source) {
+      const credits = [];
+      let current = null;
+      function commit() {
+        if (!current) return;
+        while (current.lines.length && !current.lines[0].trim()) current.lines.shift();
+        while (current.lines.length && !current.lines[current.lines.length - 1].trim()) current.lines.pop();
+        const roleLine = current.lines.shift() || "";
+        credits.push({role:roleLine.trim() === "-" ? "" : roleLine.trim(), name:current.lines.join("\n"), final:current.final});
+      }
+      String(source).replace(/^\uFEFF/, "").split(/\r?\n/).forEach((line) => {
+        const marker = line.trim().toLowerCase();
+        if (marker === "[credit]" || marker === "[final]") {
+          commit();
+          current = {final:marker === "[final]", lines:[]};
+        } else if (current && !line.trimStart().startsWith("#")) {
+          current.lines.push(line);
+        }
+      });
+      commit();
+      return credits.filter((credit) => credit.role || credit.name);
+    }
+
+    function renderCredits(credits) {
+      creditsRoll.replaceChildren();
+      credits.forEach((credit) => {
+        const entry = document.createElement("section");
+        entry.className = `credit-entry${credit.final ? " final-credit" : ""}`;
+        const role = document.createElement("div");
+        role.className = "credit-role";
+        role.textContent = transformNekomimiText(credit.role);
+        const name = document.createElement("div");
+        name.className = "credit-name";
+        name.textContent = transformNekomimiText(credit.name);
+        entry.append(role, name);
+        creditsRoll.append(entry);
+      });
+    }
+
+    function startCreditsScroll() {
+      window.cancelAnimationFrame(creditsAnimationFrame);
+      creditsComplete = false;
+      creditsScreen.classList.remove("complete");
+      const initialY = stage.clientHeight;
+      const finalEntry = creditsRoll.querySelector(".final-credit") || creditsRoll.lastElementChild;
+      const centeredFinalY = stage.clientHeight / 2 - (finalEntry.offsetTop + finalEntry.offsetHeight / 2);
+      const previousEntry = finalEntry.previousElementSibling;
+      const previousEntryBottom = previousEntry ? previousEntry.offsetTop + previousEntry.offsetHeight : 0;
+      const previousEntryHiddenY = -previousEntryBottom - 1;
+      const finalY = Math.min(centeredFinalY, previousEntryHiddenY);
+      const distance = Math.max(1, initialY - finalY);
+      const duration = distance / 42 * 1000;
+      const startedAt = performance.now();
+      function scrollFrame(now) {
+        const progress = Math.min(1, (now - startedAt) / duration);
+        creditsRoll.style.transform = `translateY(${initialY - distance * progress}px)`;
+        if (progress < 1) creditsAnimationFrame = requestAnimationFrame(scrollFrame);
+        else {
+          creditsComplete = true;
+          creditsScreen.classList.add("complete");
+        }
+      }
+      creditsAnimationFrame = requestAnimationFrame(scrollFrame);
+    }
+
+    function finishEnding() {
+      if (!endingActive || creditsScreen.hidden || stage.classList.contains("ending-full-fade")) return;
+      creditsStarting = false;
+      window.cancelAnimationFrame(creditsAnimationFrame);
+      window.clearTimeout(endingCaptionExitTimer);
+      endingCaptionExitTimer = 0;
+      creditsScreen.classList.add("credits-fading-out");
+      stage.classList.add("ending-full-fade");
+      window.setTimeout(() => {
+        endingActive = false;
+        activeEndingNumber = null;
+        creditsComplete = false;
+        creditsScreen.hidden = true;
+        creditsScreen.classList.remove("complete", "credits-fading-out");
+        endingScreen.hidden = true;
+        endingScreen.style.pointerEvents = "";
+        stage.classList.remove("ending-background-out", "ending-full-fade");
+        document.getElementById("TEXT").style.visibility = "";
+        document.querySelector(".toolbar").style.visibility = "";
+        window.frames.sys.returnToTitle(true);
+      }, 1250);
+    }
+
+    function showGameOver() {
+      if (!gameOverScreen.hidden) return;
+      stopScreenShake();
+      stopAllSkip();
+      stopVoice();
+      stopBgm();
+      setStoryUiBlocked(true);
+      document.getElementById("TEXT").style.visibility = "hidden";
+      stage.classList.add("game-over-active");
+      gameOverScreen.hidden = false;
+      gameOverScreen.focus({preventScroll:true});
+    }
+
+    function handleGameOverPointerDown(event) {
+      if (event.button !== undefined && event.button !== 0) return;
+      event.preventDefault();
+      returnToTitleFromGameOver();
+    }
+
+    function returnToTitleFromGameOver() {
+      if (gameOverScreen.hidden || screenFadeActive) return;
+      gameOverExitFade = true;
+      startExitToTitle();
+    }
+
+    function openSettings() {
+      if (storyUiBlocked) return;
+      stopScreenShake();
+      settingsDialog.classList.remove("replay-only");
+      document.getElementById("settingsDialogTitle").textContent = "設定";
+      document.getElementById("settingsDialogHint").textContent = "枠外のクリック、右クリック、または0キーで閉じます";
+      document.getElementById("returnTitleButton").disabled = !startScreen.classList.contains("hidden");
+      const storedVolume = Number(localStorage.getItem("Time2:MusicVolume"));
+      musicVolume.value = Number.isInteger(storedVolume) && storedVolume >= 0 && storedVolume <= 10 ? storedVolume : 8;
+      musicMute.checked = localStorage.getItem("Time2:MusicMuted") === "true";
+      const storedVoiceVolume = Number(localStorage.getItem("Time2:VoiceVolume"));
+      voiceVolume.value = Number.isInteger(storedVoiceVolume) && storedVoiceVolume >= 1 && storedVoiceVolume <= 10 ? storedVoiceVolume : 8;
+      voiceMute.checked = localStorage.getItem("Time2:VoiceMuted") === "true";
+      const storedSystemSoundVolume = Number(localStorage.getItem("Time2:SystemSoundVolume"));
+      systemSoundVolume.value = Number.isInteger(storedSystemSoundVolume) && storedSystemSoundVolume >= 0 && storedSystemSoundVolume <= 10 ? storedSystemSoundVolume : 8;
+      systemSoundMute.checked = localStorage.getItem("Time2:SystemSoundMuted") === "true";
+      const storedScenarioSoundVolume = Number(localStorage.getItem("Time2:ScenarioSoundVolume"));
+      scenarioSoundVolume.value = Number.isInteger(storedScenarioSoundVolume) && storedScenarioSoundVolume >= 0 && storedScenarioSoundVolume <= 10 ? storedScenarioSoundVolume : 8;
+      scenarioSoundMute.checked = localStorage.getItem("Time2:ScenarioSoundMuted") === "true";
+      fontSize.value = String(window.fontSizeLevel);
+      fontSizeValue.value = String(window.fontSizeLevel);
+      fontSizeValue.textContent = String(window.fontSizeLevel);
+      updateModeButtons();
+      updateImageEffectButtons();
+      updateSkipUnreadButtons();
+      applyAudioSettings();
+      applyVoiceSettings();
+      applySystemSoundSettings();
+      applyScenarioSoundSettings();
+      if (!settingsDialog.open) { settingsDialog.showModal(); playSystemSound("dialog"); }
+      updateTitleMenuState();
+    }
+
+    function handleSystemMenuAction() {
+      openSettings();
+    }
+
+    function openItemInventory() {
+      if (musicModeActive || window.bonusMode || window.endingReplayMode || storyUiBlocked || !startScreen.classList.contains("hidden") || saveDialog.open || settingsDialog.open) return;
+      stopScreenShake();
+      renderItemInventory();
+      if (!itemDialog.open) { itemDialog.showModal(); playSystemSound("dialog"); }
+      updateTitleMenuState();
+    }
+
+    function renderItemInventory() {
+      itemList.replaceChildren();
+      itemDialogCount.textContent = `${currentItemInventory.length}個`;
+      if (!currentItemInventory.length) {
+        const empty = document.createElement("p");
+        empty.className = "item-empty";
+        empty.textContent = "現在所持しているアイテムはありません。";
+        itemList.append(empty);
+        return;
+      }
+      currentItemInventory.forEach((item) => {
+        const entry = document.createElement("p");
+        entry.className = "item-entry";
+        entry.textContent = transformNekomimiText(item.name);
+        itemList.append(entry);
+      });
+    }
+
+    function updateItemInventory(items, change) {
+      currentItemInventory = Array.isArray(items) ? items.map((item) => ({flag: item.flag, name: item.name})) : [];
+      const button = window.frames.sys?.document?.querySelector("[data-menu-items]");
+      const count = button?.querySelector("[data-item-count]");
+      if (count) count.textContent = String(currentItemInventory.length);
+      if (itemDialog.open) renderItemInventory();
+      if (!change || !button) return;
+      window.clearTimeout(itemFlashTimer);
+      button.classList.remove("item-increase", "item-decrease");
+      void button.offsetWidth;
+      const flashClass = change === "decrease" ? "item-decrease" : "item-increase";
+      button.classList.add(flashClass);
+      playSystemSound("item");
+      itemFlashTimer = window.setTimeout(() => button.classList.remove(flashClass), 3200);
+    }
+
+    function applyAudioSettings() {
+      const volume = Number(musicVolume.value);
+      musicVolumeValue.value = String(volume);
+      musicVolumeValue.textContent = String(volume);
+      bgmPlayer.volume = currentMusicVolume();
+      musicModePlayer.volume = currentMusicVolume();
+      localStorage.setItem("Time2:MusicVolume", String(volume));
+      localStorage.setItem("Time2:MusicMuted", String(musicMute.checked));
+    }
+
+    function applyFontSizeSetting() {
+      window.fontSizeLevel = Math.max(1, Math.min(5, Number(fontSize.value) || 3));
+      fontSizeValue.value = String(window.fontSizeLevel);
+      fontSizeValue.textContent = String(window.fontSizeLevel);
+      localStorage.setItem("Time2:FontSize", String(window.fontSizeLevel));
+      if (window.frames.TEXT && typeof window.frames.TEXT.applyFontSize === "function") window.frames.TEXT.applyFontSize(window.fontSizeLevel);
+    }
+
+    function applyVoiceSettings() {
+      const volume = Math.max(1, Math.min(10, Number(voiceVolume.value) || 8));
+      voiceVolumeValue.value = String(volume);
+      voiceVolumeValue.textContent = String(volume);
+      voicePlayer.volume = voiceMute.checked ? 0 : volume / 10;
+      localStorage.setItem("Time2:VoiceVolume", String(volume));
+      localStorage.setItem("Time2:VoiceMuted", String(voiceMute.checked));
+    }
+
+    function applySystemSoundSettings() {
+      const volume = Math.max(0, Math.min(10, Number(systemSoundVolume.value) || 0));
+      systemSoundVolumeValue.value = String(volume);
+      systemSoundVolumeValue.textContent = String(volume);
+      activeSystemSoundPlayers.forEach((player) => player.volume = currentSystemSoundVolume());
+      localStorage.setItem("Time2:SystemSoundVolume", String(volume));
+      localStorage.setItem("Time2:SystemSoundMuted", String(systemSoundMute.checked));
+    }
+
+    function applyScenarioSoundSettings() {
+      const volume = Math.max(0, Math.min(10, Number(scenarioSoundVolume.value) || 0));
+      scenarioSoundVolumeValue.value = String(volume);
+      scenarioSoundVolumeValue.textContent = String(volume);
+      loopingScenarioSoundPlayer.volume = currentScenarioSoundVolume();
+      activeScenarioSoundPlayers.forEach((player) => player.volume = currentScenarioSoundVolume());
+      localStorage.setItem("Time2:ScenarioSoundVolume", String(volume));
+      localStorage.setItem("Time2:ScenarioSoundMuted", String(scenarioSoundMute.checked));
+      if (loopingScenarioSoundName && loopingScenarioSoundPlayer.paused && currentScenarioSoundVolume() > 0) {
+        setLoopingScenarioSound(loopingScenarioSoundName);
+      }
+    }
+
+    function setGameMode(mode) {
+      if (mode !== "original" && mode !== "remake") return;
+      const modeChanged = window.gameMode !== mode;
+      window.gameMode = mode;
+      document.documentElement.dataset.gameMode = mode;
+      localStorage.setItem("Time2:GameMode", mode);
+      updateModeButtons();
+      if (window.frames.sys && typeof window.frames.sys.appUrl === "function") {
+        renderGraphics(window.frames.sys.drawgrp(), window.imageEffectsEnabled);
+      }
+      if (modeChanged && requestedBgm.startsWith("modebgm|")) playBgm(requestedBgm);
+      if (modeChanged && galleryActive) {
+        void renderGalleryGrid();
+        if (!galleryViewer.hidden && galleryCurrentIndex >= 0) void renderGalleryViewer();
+      }
+    }
+
+    function updateModeButtons() {
+      document.querySelectorAll(".mode-button[data-mode]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.mode === window.gameMode));
+      });
+    }
+
+    function setImageEffects(enabled) {
+      window.imageEffectsEnabled = Boolean(enabled);
+      localStorage.setItem("Time2:ImageEffects", String(window.imageEffectsEnabled));
+      updateImageEffectButtons();
+    }
+
+    function updateImageEffectButtons() {
+      document.querySelectorAll(".mode-button[data-image-effect]").forEach((button) => {
+        button.setAttribute("aria-pressed", String((button.dataset.imageEffect === "on") === window.imageEffectsEnabled));
+      });
+    }
+
+    function setSkipUnread(enabled) {
+      window.skipUnreadMessages = Boolean(enabled);
+      localStorage.setItem("Time2:SkipUnread", String(window.skipUnreadMessages));
+      updateSkipUnreadButtons();
+    }
+
+    function updateSkipUnreadButtons() {
+      document.querySelectorAll(".mode-button[data-skip-unread]").forEach((button) => {
+        button.setAttribute("aria-pressed", String((button.dataset.skipUnread === "true") === window.skipUnreadMessages));
+      });
+    }
+
+    function startButtonSkip() {
+      stopScreenShake();
+      buttonSkipActive = !buttonSkipActive;
+      if (buttonSkipActive) { stopVoice(); scheduleSkipStep(0); }
+      else updateSkipButton();
+    }
+
+    function stopAllSkip() {
+      window.clearTimeout(skipTimer);
+      controlSkipActive = false;
+      buttonSkipActive = false;
+      updateSkipButton();
+    }
+
+    function setControlSkip(active) {
+      if (active) stopScreenShake();
+      controlSkipActive = Boolean(active);
+      if (controlSkipActive) { stopVoice(); scheduleSkipStep(0); }
+      else if (!buttonSkipActive) updateSkipButton();
+    }
+
+    function scheduleSkipStep(delay = 34) {
+      window.clearTimeout(skipTimer);
+      updateSkipButton();
+      skipTimer = window.setTimeout(runSkipStep, delay);
+    }
+
+    function runSkipStep() {
+      if (!controlSkipActive && !buttonSkipActive) { updateSkipButton(); return; }
+      const textFrame = window.frames.TEXT;
+      if (!textFrame || typeof textFrame.skipCurrentMessage !== "function") { scheduleSkipStep(24); return; }
+      const result = textFrame.skipCurrentMessage();
+      if (result !== true) {
+        controlSkipActive = false;
+        buttonSkipActive = false;
+        updateSkipButton();
+        return;
+      }
+      scheduleSkipStep();
+    }
+
+    function updateSkipButton() {
+      const button = window.frames.sys?.document?.querySelector("[data-skip-button]");
+      if (!button) return;
+      const active = controlSkipActive || buttonSkipActive;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    }
+
+    function isTextSkipActive() {
+      return controlSkipActive || buttonSkipActive;
+    }
+    window.isTextSkipActive = isTextSkipActive;
+
+    function stopScreenShake() {
+      const animation = screenShakeAnimation;
+      screenShakeAnimation = null;
+      if (animation) {
+        try { animation.cancel(); } catch (error) {}
+      }
+      gameShell.style.transform = "";
+      gameShell.style.translate = "";
+    }
+    window.stopScreenShake = stopScreenShake;
+    window.isScreenShakeActive = () => Boolean(screenShakeAnimation);
+
+    function startScreenShake(level = 0) {
+      stopScreenShake();
+      if (isTextSkipActive()) return;
+      const safeLevel = Math.max(0, Math.min(3, Number(level) || 0));
+      const patterns = [
+        {duration:240, frames:[[0,0],[0,-4],[0,3],[0,0]]},
+        {duration:420, frames:[[0,0],[-3,-3],[3,2],[-2,3],[2,-2],[0,0]]},
+        {duration:500, frames:[[0,0],[0,-14],[0,10],[0,-8],[0,5],[0,0]]},
+        {duration:700, frames:[[0,0],[-16,-12],[14,10],[-13,14],[16,-9],[-10,-13],[8,11],[-5,-6],[0,0]]}
+      ];
+      const pattern = patterns[safeLevel];
+      const animation = gameShell.animate(
+        pattern.frames.map(([x,y]) => ({transform:`translate3d(${x}px,${y}px,0)`})),
+        {duration:pattern.duration, easing:"ease-out", iterations:1}
+      );
+      screenShakeAnimation = animation;
+      animation.addEventListener("finish", () => {
+        if (screenShakeAnimation !== animation) return;
+        screenShakeAnimation = null;
+        gameShell.style.transform = "";
+        gameShell.style.translate = "";
+      }, {once:true});
+      animation.addEventListener("cancel", () => {
+        if (screenShakeAnimation === animation) screenShakeAnimation = null;
+        gameShell.style.transform = "";
+        gameShell.style.translate = "";
+      }, {once:true});
+    }
+    window.startScreenShake = startScreenShake;
+
+    function graphicsDocument(fragment) {
+      const baseUrl = new URL("html/", location.href).href;
+      return `<!doctype html><html><head><base href="${baseUrl}"><style>html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#000}img{display:block}</style></head>${fragment || "<body></body>"}</html>`;
+    }
+
+    async function resolveGraphicsFragment(fragment) {
+      const parser = new DOMParser();
+      const documentFragment = parser.parseFromString(fragment || "<body></body>", "text/html");
+      const targetMode = window.gameMode;
+      const nextLayers = {jpg: [], gif: []};
+      const layers = Array.from(documentFragment.querySelectorAll("[data-scene-layer]"));
+      await Promise.all(layers.map(async (layer) => {
+        const kind = layer.dataset.layerKind;
+        const slot = Number(layer.dataset.layerSlot) || 0;
+        const image = layer.querySelector("img");
+        if (!image || !nextLayers[kind]) return;
+        const originalSource = image.dataset.originalSource;
+        const remakeSource = image.dataset.remakeSource;
+        let resolvedSource = "";
+        if (targetMode === "remake") {
+          const nekomimiSource = window.nekomimiMode ? nekomimiAssetSource(remakeSource, kind) : "";
+          if (nekomimiSource && await sceneAssetExists(nekomimiSource)) resolvedSource = nekomimiSource;
+          else if (await sceneAssetExists(remakeSource)) resolvedSource = remakeSource;
+          else if (await sceneAssetExists(originalSource)) resolvedSource = originalSource;
+        } else if (await sceneAssetExists(originalSource)) {
+          resolvedSource = originalSource;
+        }
+        if (resolvedSource) {
+          const versionedSource = new URL(resolvedSource, new URL("html/", location.href));
+          versionedSource.searchParams.set("v", window.sceneAssetVersion);
+          image.src = versionedSource.href;
+          nextLayers[kind][slot] = layer.outerHTML;
+          return;
+        }
+        const retainedLayer = currentResolvedLayers[kind]?.[slot];
+        if (retainedLayer) {
+          const holder = document.createElement("div");
+          holder.innerHTML = retainedLayer;
+          const retainedElement = holder.firstElementChild;
+          if (retainedElement) layer.replaceWith(retainedElement);
+          nextLayers[kind][slot] = retainedLayer;
+        } else {
+          layer.remove();
+        }
+      }));
+      return {fragment: documentFragment.body.outerHTML, layers: nextLayers};
+    }
+
+    function nekomimiAssetSource(remakeSource, kind) {
+      if (!remakeSource) return "";
+      return kind === "gif"
+        ? remakeSource.replace("/remake/gif/", "/remake/ngif/")
+        : remakeSource.replace("/remake/jpg/", "/remake/njpg/");
+    }
+
+    async function sceneAssetExists(source) {
+      if (!source) return false;
+      const absoluteUrl = new URL(source, new URL("html/", location.href)).href;
+      if (assetExistenceCache.has(absoluteUrl)) return assetExistenceCache.get(absoluteUrl);
+      let exists = false;
+      try {
+        const response = await fetch(absoluteUrl, {method:"HEAD", cache:"no-store"});
+        exists = response.ok;
+      } catch (error) {}
+      assetExistenceCache.set(absoluteUrl, exists);
+      return exists;
+    }
+
+    async function renderGraphics(fragment, useEffect = true) {
+      const stage = document.querySelector(".stage");
+      if (graphicsTransitionBusy) {
+        pendingGraphicsRequest = { fragment, useEffect };
+        return;
+      }
+
+      graphicsTransitionBusy = true;
+      const resolvedGraphics = await resolveGraphicsFragment(fragment);
+      const nextHtml = graphicsDocument(resolvedGraphics.fragment);
+      if (nextHtml === currentGraphicsHtml) {
+        graphicsTransitionBusy = false;
+        if (pendingGraphicsRequest) {
+          const pending = pendingGraphicsRequest;
+          pendingGraphicsRequest = null;
+          renderGraphics(pending.fragment, pending.useEffect);
+        }
+        return;
+      }
+      const outgoingFrame = document.getElementById(activeGraphicsFrameId);
+      const incomingFrameId = activeGraphicsFrameId === "GRP" ? "GRP_PREV" : "GRP";
+      const incomingFrame = document.getElementById(incomingFrameId);
+      const token = ++graphicsTransitionToken;
+      const shouldAnimate = Boolean(useEffect && window.imageEffectsEnabled && currentGraphicsHtml && currentGraphicsHtml !== nextHtml);
+
+      stage.classList.remove("graphics-transition");
+      outgoingFrame.style.zIndex = "1";
+      outgoingFrame.style.opacity = "1";
+      incomingFrame.style.zIndex = "2";
+      incomingFrame.style.opacity = "0";
+
+      incomingFrame.onload = () => {
+        if (token !== graphicsTransitionToken) return;
+        if (!shouldAnimate) {
+          incomingFrame.style.opacity = "1";
+          outgoingFrame.style.opacity = "0";
+          finishGraphicsTransition();
+          return;
+        }
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          if (token !== graphicsTransitionToken) return;
+          stage.classList.add("graphics-transition");
+          incomingFrame.style.opacity = "1";
+          window.setTimeout(() => {
+            if (token !== graphicsTransitionToken) return;
+            stage.classList.remove("graphics-transition");
+            finishGraphicsTransition();
+          }, 520);
+        }));
+      };
+      incomingFrame.srcdoc = nextHtml;
+
+      function finishGraphicsTransition() {
+        currentGraphicsHtml = nextHtml;
+        currentResolvedLayers = resolvedGraphics.layers;
+        activeGraphicsFrameId = incomingFrameId;
+        outgoingFrame.style.opacity = "0";
+        incomingFrame.style.zIndex = "1";
+        outgoingFrame.style.zIndex = "0";
+        graphicsTransitionBusy = false;
+        if (!pendingGraphicsRequest) return;
+        const pending = pendingGraphicsRequest;
+        pendingGraphicsRequest = null;
+        renderGraphics(pending.fragment, pending.useEffect);
+      }
+    }
+
+    async function unlockAudio() {
+      if (audioUnlocked) return true;
+      const silentWav = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+      const oldVolume = bgmPlayer.volume;
+      bgmPlayer.volume = 0;
+      bgmPlayer.src = silentWav;
+      try {
+        await bgmPlayer.play();
+        bgmPlayer.pause();
+        bgmPlayer.currentTime = 0;
+        audioUnlocked = true;
+      } catch (error) {
+        audioUnlocked = false;
+      }
+      document.documentElement.dataset.audioUnlocked = String(audioUnlocked);
+      bgmPlayer.volume = oldVolume;
+      return audioUnlocked;
+    }
+
+    function soundUrl(name) {
+      const url = new URL(`se/${encodeURIComponent(name)}.mp3`, location.href);
+      url.searchParams.set("se-cache", `${soundEffectCacheSession}-${++soundEffectCacheSerial}`);
+      return url.href;
+    }
+
+    function currentSystemSoundVolume() {
+      return systemSoundMute.checked ? 0 : Number(systemSoundVolume.value) / 10;
+    }
+
+    function currentScenarioSoundVolume() {
+      return scenarioSoundMute.checked ? 0 : Number(scenarioSoundVolume.value) / 10;
+    }
+
+    function playAudioFileSilentlyIfMissing(name, volume, collection, loop = false) {
+      if (!audioPlaybackAllowed || !name || volume <= 0) return null;
+      const player = new Audio();
+      player.preload = "auto";
+      player.loop = loop;
+      player.volume = volume;
+      player.src = soundUrl(name);
+      collection.add(player);
+      const dispose = () => collection.delete(player);
+      player.addEventListener("ended", dispose, {once:true});
+      player.addEventListener("error", dispose, {once:true});
+      player.play().catch(dispose);
+      return player;
+    }
+
+    function playSystemSound(kind) {
+      const name = kind === "click" && window.nekomimiMode ? "sys_cat" : systemSoundFiles[kind];
+      if (!name) return;
+      playAudioFileSilentlyIfMissing(name, currentSystemSoundVolume(), activeSystemSoundPlayers);
+    }
+    window.playSystemSound = playSystemSound;
+
+    let lastSystemFocusTarget = null;
+    let lastSystemFocusAt = 0;
+    function installSystemSoundHandlers(targetDocument) {
+      if (!targetDocument || targetDocument.documentElement.dataset.systemSoundHandlers === "true") return;
+      targetDocument.documentElement.dataset.systemSoundHandlers = "true";
+      const focusButton = (event) => {
+        const button = event.target.closest?.("button:not(:disabled)");
+        if (!button || button.classList.contains("story-choice")) return;
+        if (event.type === "pointerover" && event.relatedTarget && button.contains(event.relatedTarget)) return;
+        const now = performance.now();
+        if (button === lastSystemFocusTarget && now - lastSystemFocusAt < 180) return;
+        lastSystemFocusTarget = button;
+        lastSystemFocusAt = now;
+        playSystemSound("focus");
+      };
+      targetDocument.addEventListener("pointerover", focusButton, true);
+      targetDocument.addEventListener("focusin", focusButton, true);
+      targetDocument.addEventListener("click", (event) => {
+        const button = event.target.closest?.("button:not(:disabled)");
+        if (!button || button.classList.contains("story-choice") || button.classList.contains("page-button")) return;
+        playSystemSound(button.classList.contains("dialog-close") || button.id === "uiConfirmCancel" ? "cancel" : "click");
+      }, true);
+    }
+    installSystemSoundHandlers(document);
+
+    function playScenarioSound(name) {
+      if (name === "off") {
+        activeScenarioSoundPlayers.forEach((player) => { player.pause(); player.removeAttribute("src"); });
+        activeScenarioSoundPlayers.clear();
+        return;
+      }
+      playAudioFileSilentlyIfMissing(name, currentScenarioSoundVolume(), activeScenarioSoundPlayers);
+    }
+    window.playScenarioSound = playScenarioSound;
+
+    function setLoopingScenarioSound(name) {
+      name = name === "off" ? "" : String(name || "");
+      if (loopingSoundFadeState) clearLoopingSoundFadeAnimation();
+      if (name && name === failedLoopingScenarioSoundName) return;
+      if (name === loopingScenarioSoundName && (!name || !loopingScenarioSoundPlayer.paused)) {
+        loopingScenarioSoundPlayer.volume = currentScenarioSoundVolume();
+        return;
+      }
+      loopingScenarioSoundName = name;
+      if (failedLoopingScenarioSoundName !== name) failedLoopingScenarioSoundName = "";
+      loopingScenarioSoundPlayer.pause();
+      loopingScenarioSoundPlayer.removeAttribute("src");
+      loopingScenarioSoundPlayer.load();
+      if (!name || !audioPlaybackAllowed || currentScenarioSoundVolume() <= 0) return;
+      loopingScenarioSoundPlayer.loop = true;
+      loopingScenarioSoundPlayer.volume = currentScenarioSoundVolume();
+      loopingScenarioSoundPlayer.src = soundUrl(name);
+      loopingScenarioSoundPlayer.addEventListener("error", () => {
+        if (loopingScenarioSoundName === name) failedLoopingScenarioSoundName = name;
+      }, {once:true});
+      loopingScenarioSoundPlayer.play().catch(() => {});
+    }
+    window.setLoopingScenarioSound = setLoopingScenarioSound;
+
+    function clearLoopingSoundFadeAnimation() {
+      if (loopingSoundFadeAnimationFrame) cancelAnimationFrame(loopingSoundFadeAnimationFrame);
+      loopingSoundFadeAnimationFrame = 0;
+      loopingSoundFadeState = null;
+    }
+
+    function finishLoopingSoundFadeImmediately(state = loopingSoundFadeState) {
+      if (!state || state !== loopingSoundFadeState) return false;
+      if (loopingSoundFadeAnimationFrame) cancelAnimationFrame(loopingSoundFadeAnimationFrame);
+      loopingSoundFadeAnimationFrame = 0;
+      loopingSoundFadeState = null;
+      if (loopingScenarioSoundPlayer.src !== state.source) return false;
+      loopingScenarioSoundPlayer.pause();
+      loopingScenarioSoundPlayer.removeAttribute("src");
+      loopingScenarioSoundPlayer.load();
+      loopingScenarioSoundPlayer.volume = currentScenarioSoundVolume();
+      loopingScenarioSoundName = "";
+      return true;
+    }
+
+    function fadeOutLoopingSoundForScreenFade(duration) {
+      clearLoopingSoundFadeAnimation();
+      if (window.frames.MAIN && typeof window.frames.MAIN.stopLoopingSoundForFade === "function") {
+        window.frames.MAIN.stopLoopingSoundForFade();
+      }
+      const state = {source: loopingScenarioSoundPlayer.src, name: loopingScenarioSoundName};
+      loopingSoundFadeState = state;
+      if (loopingScenarioSoundPlayer.paused || !state.source || duration <= 0) {
+        finishLoopingSoundFadeImmediately(state);
+        return;
+      }
+      const startVolume = loopingScenarioSoundPlayer.volume;
+      const startedAt = performance.now();
+      const fadeFrame = (now) => {
+        if (state !== loopingSoundFadeState || loopingScenarioSoundPlayer.src !== state.source) {
+          loopingSoundFadeAnimationFrame = 0;
+          return;
+        }
+        const progress = Math.min(1, (now - startedAt) / duration);
+        loopingScenarioSoundPlayer.volume = startVolume * (1 - progress);
+        if (progress < 1) {
+          loopingSoundFadeAnimationFrame = requestAnimationFrame(fadeFrame);
+          return;
+        }
+        loopingSoundFadeAnimationFrame = 0;
+        finishLoopingSoundFadeImmediately(state);
+      };
+      loopingSoundFadeAnimationFrame = requestAnimationFrame(fadeFrame);
+    }
+
+    function stopScenarioSounds() {
+      playScenarioSound("off");
+      setLoopingScenarioSound("");
+    }
+    window.stopScenarioSounds = stopScenarioSounds;
+
+    function isBgmActuallyPlaying(request) {
+      return Boolean(request && playingBgmRequest === request && playingBgmSource
+        && !bgmPlayer.paused && !bgmPlayer.ended && bgmPlayer.readyState >= 2);
+    }
+    window.isBgmActuallyPlaying = isBgmActuallyPlaying;
+
+    async function playBgm(request, retryCount = 0) {
+      clearBgmScreenFadeAnimation();
+      const immediateSwitch = window.forceImmediateBgmSwitch === true;
+      window.forceImmediateBgmSwitch = false;
+      const switchToken = ++bgmSwitchToken;
+      requestedBgm = request || "";
+      if (!requestedBgm) { stopBgm(); return; }
+      const resolved = requestedBgm.startsWith("modebgm|")
+        ? await resolveModeBgm(requestedBgm)
+        : await resolveSingleBgm(requestedBgm);
+      if (switchToken !== bgmSwitchToken || requestedBgm !== request) return false;
+      if (!resolved) {
+        markBgmStopped();
+        scheduleBgmRetry(request, retryCount, switchToken, new Error("BGMファイルが見つかりません"));
+        return false;
+      }
+      const {playOnce, source, midiUrl} = resolved;
+      if (bgmPlayer.src === source && !bgmPlayer.paused && bgmPlayer.loop === !playOnce) {
+        bgmPlayer.volume = currentMusicVolume();
+        playingBgmRequest = request;
+        playingBgmSource = source;
+        return true;
+      }
+      if (bgmPlayer.src && !bgmPlayer.paused && bgmPlayer.src !== source) {
+        const completed = immediateSwitch ? (bgmPlayer.pause(), true) : await fadeOutCurrentBgm(switchToken);
+        if (!completed || switchToken !== bgmSwitchToken || requestedBgm !== request) return false;
+        playingBgmRequest = "";
+        playingBgmSource = "";
+      }
+      let lastError = null;
+      try {
+        if (await tryPlayBgmSource(source, playOnce, request, switchToken)) return true;
+      } catch (error) {
+        lastError = error;
+      }
+      if (source !== midiUrl && switchToken === bgmSwitchToken && requestedBgm === request) {
+        try {
+          if (await tryPlayBgmSource(midiUrl, playOnce, request, switchToken)) return true;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (switchToken !== bgmSwitchToken || requestedBgm !== request) return false;
+      markBgmStopped();
+      scheduleBgmRetry(request, retryCount, switchToken, lastError);
+      return false;
+    }
+
+    async function tryPlayBgmSource(source, playOnce, request, switchToken) {
+      if (switchToken !== bgmSwitchToken || requestedBgm !== request) return false;
+      bgmPlayer.pause();
+      bgmPlayer.loop = !playOnce;
+      bgmPlayer.src = source;
+      bgmPlayer.volume = currentMusicVolume();
+      try {
+        await bgmPlayer.play();
+      } catch (error) {
+        if (switchToken === bgmSwitchToken && requestedBgm === request) {
+          console.warn("BGMを再生できませんでした", {request, source, error});
+        }
+        throw error;
+      }
+      if (switchToken !== bgmSwitchToken || requestedBgm !== request) return false;
+      playingBgmRequest = request;
+      playingBgmSource = source;
+      document.documentElement.dataset.bgmState = "playing";
+      return true;
+    }
+
+    function scheduleBgmRetry(request, retryCount, switchToken, error) {
+      console.warn("BGM切り替えを完了できませんでした", {request, retryCount, error});
+      document.documentElement.dataset.bgmState = "retrying";
+      if (retryCount >= 2) {
+        document.documentElement.dataset.bgmState = "failed";
+        return;
+      }
+      window.setTimeout(() => {
+        if (switchToken !== bgmSwitchToken || requestedBgm !== request || isBgmActuallyPlaying(request)) return;
+        playBgm(request, retryCount + 1);
+      }, 700 * (retryCount + 1));
+    }
+
+    function markBgmStopped() {
+      bgmPlayer.pause();
+      playingBgmRequest = "";
+      playingBgmSource = "";
+      document.documentElement.dataset.bgmState = "stopped";
+    }
+
+    async function resolveSingleBgm(request) {
+      const playOnce = request.startsWith("@");
+      const midiName = playOnce ? request.slice(1) : request;
+      const baseName = midiName.replace(/\.mid$/i, "");
+      const mp3Url = new URL(`mp3/${baseName}.mp3`, location.href).href;
+      const midiUrl = new URL(`mid/${midiName}`, location.href).href;
+      return {playOnce, source: await assetExists(mp3Url) ? mp3Url : midiUrl, midiUrl};
+    }
+
+    async function resolveModeBgm(request) {
+      const fields = request.split("|");
+      if (fields.length !== 4) return null;
+      const playOnce = decodeURIComponent(fields[1]) === "1";
+      const remakeName = decodeURIComponent(fields[2]);
+      const originalName = decodeURIComponent(fields[3]);
+      const preferred = window.gameMode === "remake" ? remakeName : originalName;
+      const fallback = window.gameMode === "remake" ? originalName : remakeName;
+      for (const baseName of [preferred, fallback]) {
+        const mp3Url = new URL(`mp3/${baseName}.mp3`, location.href).href;
+        const midiUrl = new URL(`mid/${baseName}.mid`, location.href).href;
+        if (await assetExists(mp3Url)) return {playOnce, source: mp3Url, midiUrl};
+        if (await assetExists(midiUrl)) return {playOnce, source: midiUrl, midiUrl};
+      }
+      return null;
+    }
+
+    async function assetExists(url) {
+      try {
+        const response = await fetch(url, {method:"HEAD", cache:"no-store"});
+        return response.ok;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function playVoice(voiceName) {
+      if (!audioPlaybackAllowed || !voiceName || isSkipping()) return;
+      voiceQueue.push(voiceName);
+      processVoiceQueue();
+    }
+
+    async function processVoiceQueue() {
+      if (voiceLoading || !voicePlayer.paused || !voiceQueue.length || isSkipping()) return;
+      voiceLoading = true;
+      const voiceName = voiceQueue.shift();
+      const requestToken = voiceRequestToken;
+      const voiceUrlObject = new URL(`voice/${encodeURIComponent(voiceName)}.mp3`, location.href);
+      voiceUrlObject.searchParams.set("voice-cache", `${voiceCacheSession}-${++voiceCacheSerial}`);
+      const voiceUrl = voiceUrlObject.href;
+      try {
+        const response = await fetch(voiceUrl, { method: "HEAD", cache: "no-store" });
+        if (!response.ok || requestToken !== voiceRequestToken || isSkipping()) {
+          voiceLoading = false;
+          processVoiceQueue();
+          return;
+        }
+        voicePlayer.src = voiceUrl;
+        voicePlayer.volume = voiceMute.checked ? 0 : Number(voiceVolume.value) / 10;
+        voiceLoading = false;
+        await voicePlayer.play();
+      } catch (error) {
+        voiceLoading = false;
+        processVoiceQueue();
+      }
+    }
+
+    function stopVoice() {
+      voiceRequestToken += 1;
+      voiceLoading = false;
+      voiceQueue = [];
+      voicePlayer.pause();
+      voicePlayer.removeAttribute("src");
+      voicePlayer.load();
+    }
+
+    function replayVoice(voiceName) {
+      if (!audioPlaybackAllowed || !voiceName || isSkipping()) return;
+      stopVoice();
+      playVoice(voiceName);
+    }
+
+    function isSkipping() {
+      return controlSkipActive || buttonSkipActive;
+    }
+
+    voicePlayer.addEventListener("ended", () => {
+      voicePlayer.removeAttribute("src");
+      voicePlayer.load();
+      processVoiceQueue();
+    });
+
+    function currentMusicVolume() {
+      return musicMute.checked ? 0 : Number(musicVolume.value) / 10;
+    }
+
+    function fadeOutCurrentBgm(switchToken) {
+      const startVolume = bgmPlayer.volume;
+      const startedAt = performance.now();
+      return new Promise((resolve) => {
+        function fadeFrame(now) {
+          if (switchToken !== bgmSwitchToken) { resolve(false); return; }
+          const progress = Math.min(1, (now - startedAt) / 450);
+          bgmPlayer.volume = startVolume * (1 - progress);
+          if (progress < 1) requestAnimationFrame(fadeFrame);
+          else { bgmPlayer.pause(); resolve(true); }
+        }
+        requestAnimationFrame(fadeFrame);
+      });
+    }
+
+    function clearBgmScreenFadeAnimation() {
+      if (bgmScreenFadeAnimationFrame) cancelAnimationFrame(bgmScreenFadeAnimationFrame);
+      bgmScreenFadeAnimationFrame = 0;
+      bgmScreenFadeState = null;
+    }
+
+    function finishBgmScreenFadeImmediately(state = bgmScreenFadeState) {
+      if (!state || state !== bgmScreenFadeState) return false;
+      if (bgmScreenFadeAnimationFrame) cancelAnimationFrame(bgmScreenFadeAnimationFrame);
+      bgmScreenFadeAnimationFrame = 0;
+      bgmScreenFadeState = null;
+      if (state.switchToken !== bgmSwitchToken || bgmPlayer.src !== state.source) return false;
+      bgmPlayer.pause();
+      bgmPlayer.removeAttribute("src");
+      bgmPlayer.load();
+      bgmPlayer.volume = currentMusicVolume();
+      playingBgmRequest = "";
+      playingBgmSource = "";
+      document.documentElement.dataset.bgmState = "stopped";
+      return true;
+    }
+
+    function fadeOutBgmForScreenFade(duration) {
+      clearBgmScreenFadeAnimation();
+      const switchToken = ++bgmSwitchToken;
+      requestedBgm = "";
+      const state = {switchToken, source: bgmPlayer.src};
+      bgmScreenFadeState = state;
+      if (bgmPlayer.paused || !bgmPlayer.src || duration <= 0) {
+        finishBgmScreenFadeImmediately(state);
+        return;
+      }
+      const startVolume = bgmPlayer.volume;
+      const startedAt = performance.now();
+      const fadeFrame = (now) => {
+        if (state !== bgmScreenFadeState || switchToken !== bgmSwitchToken || bgmPlayer.src !== state.source) {
+          bgmScreenFadeAnimationFrame = 0;
+          return;
+        }
+        const progress = Math.min(1, (now - startedAt) / duration);
+        bgmPlayer.volume = startVolume * (1 - progress);
+        if (progress < 1) {
+          bgmScreenFadeAnimationFrame = requestAnimationFrame(fadeFrame);
+          return;
+        }
+        bgmScreenFadeAnimationFrame = 0;
+        finishBgmScreenFadeImmediately(state);
+      };
+      bgmScreenFadeAnimationFrame = requestAnimationFrame(fadeFrame);
+    }
+
+    function fadeOutTitleBgm(duration = 1100) {
+      if (requestedBgm !== "title.mid") return Promise.resolve();
+      if (bgmPlayer.paused || !bgmPlayer.src) {
+        stopBgm();
+        return Promise.resolve();
+      }
+      const switchToken = ++bgmSwitchToken;
+      requestedBgm = "";
+      const startVolume = bgmPlayer.volume;
+      const startedAt = performance.now();
+      return new Promise((resolve) => {
+        function fadeFrame(now) {
+          if (switchToken !== bgmSwitchToken) { resolve(); return; }
+          const progress = Math.min(1, (now - startedAt) / duration);
+          bgmPlayer.volume = startVolume * (1 - progress);
+          if (progress < 1) {
+            requestAnimationFrame(fadeFrame);
+            return;
+          }
+          bgmPlayer.pause();
+          bgmPlayer.removeAttribute("src");
+          bgmPlayer.load();
+          bgmPlayer.volume = currentMusicVolume();
+          playingBgmRequest = "";
+          playingBgmSource = "";
+          resolve();
+        }
+        requestAnimationFrame(fadeFrame);
+      });
+    }
+
+    function stopBgm() {
+      clearBgmScreenFadeAnimation();
+      bgmSwitchToken += 1;
+      requestedBgm = "";
+      bgmPlayer.pause();
+      bgmPlayer.removeAttribute("src");
+      bgmPlayer.load();
+      bgmPlayer.volume = currentMusicVolume();
+      playingBgmRequest = "";
+      playingBgmSource = "";
+      document.documentElement.dataset.bgmState = "stopped";
+    }
+
+    bgmPlayer.addEventListener("ended", () => {
+      if (bgmPlayer.loop) return;
+      playingBgmRequest = "";
+      playingBgmSource = "";
+      document.documentElement.dataset.bgmState = "ended";
+    });
+
+    async function openSaveManager(mode) {
+      if (storyUiBlocked) return;
+      if (musicModeActive || window.bonusMode || window.endingReplayMode) return;
+      if (mode === "save" && !startScreen.classList.contains("hidden")) return;
+      stopScreenShake();
+      saveMode = mode;
+      document.getElementById("saveDialogTitle").textContent = mode === "save" ? "セーブ" : "ロード";
+      document.getElementById("saveDialogHint").textContent = mode === "save" ? "保存先を選択してください" : "再開するデータを選択してください";
+      slotGrid.innerHTML = '<p style="padding:20px;color:#93a8b6">セーブデータを読み込んでいます…</p>';
+      if (!saveDialog.open) { saveDialog.showModal(); playSystemSound("dialog"); }
+      updateTitleMenuState();
+      const slots = await window.frames.sys.getSaveSlots();
+      if (!saveDialog.open || saveMode !== mode) return;
+      savePage = pageContainingLastSaveOrLoad(slots);
+      renderSaveManager(slots);
+    }
+
+    function pageContainingLastSaveOrLoad(slots) {
+      const lastSlot = Number(localStorage.getItem(lastSaveLoadSlotKey));
+      if (Number.isInteger(lastSlot) && lastSlot >= 1 && lastSlot <= 60 && slots[lastSlot - 1]) {
+        return Math.floor((lastSlot - 1) / 6);
+      }
+      return pageContainingLatestSave(slots);
+    }
+
+    function pageContainingLatestSave(slots) {
+      let latestIndex = -1;
+      let latestTime = -Infinity;
+      slots.forEach((record, index) => {
+        if (!record) return;
+        const savedTime = Date.parse(record.savedAt || "");
+        if (Number.isFinite(savedTime) && savedTime > latestTime) {
+          latestTime = savedTime;
+          latestIndex = index;
+        }
+      });
+      return latestIndex < 0 ? 0 : Math.floor(latestIndex / 6);
+    }
+
+    function setStoryUiBlocked(blocked) {
+      storyUiBlocked = Boolean(blocked);
+      document.getElementById("sys").style.visibility = storyUiBlocked ? "hidden" : "visible";
+      const sysDocument = window.frames.sys && window.frames.sys.document;
+      if (!sysDocument) return;
+      sysDocument.querySelectorAll("button").forEach((button) => { button.disabled = storyUiBlocked; });
+    }
+
+    function openHistory() {
+      if (historyDialog.open || saveDialog.open || settingsDialog.open || itemDialog.open || !startScreen.classList.contains("hidden")) return;
+      stopScreenShake();
+      const history = window.frames.sys.messageHistory || [];
+      historyList.replaceChildren();
+      if (!history.length) {
+        const empty = document.createElement("p");
+        empty.className = "history-empty";
+        empty.textContent = "まだ履歴はありません。";
+        historyList.append(empty);
+      } else {
+        history.forEach((entry) => {
+          const item = document.createElement("p");
+          item.className = `history-entry${entry.type === "choice" ? " history-choice" : ""}`;
+          if (entry.type === "message" && window.frames.sys.isMessageRead(entry.key)) item.classList.add("history-read");
+          if (entry.type === "choice") item.textContent = `選択：${transformNekomimiText(entry.text)}`;
+          else appendHistoryMessage(item, entry.text, entry.voice);
+          historyList.append(item);
+        });
+      }
+      setStoryUiBlocked(true);
+      historyDialog.style.visibility = "hidden";
+      historyDialog.showModal();
+      playSystemSound("dialog");
+      historyList.scrollTop = Math.max(0, historyList.scrollHeight - historyList.clientHeight);
+      historyDialog.style.visibility = "";
+      requestAnimationFrame(() => {
+        historyList.scrollTop = Math.max(0, historyList.scrollHeight - historyList.clientHeight);
+      });
+    }
+
+    function appendHistoryMessage(container, text, voice) {
+      const dialogue = text.match(/^([^\n「]+?)「([\s\S]*)」$/);
+      if (dialogue) {
+        const speaker = document.createElement("span");
+        speaker.className = "history-speaker";
+        speaker.textContent = transformNekomimiText(dialogue[1]);
+        const body = document.createElement("span");
+        body.className = "history-dialogue";
+        appendHistoryLines(body, `「${transformNekomimiText(dialogue[2])}」`);
+        if (voice) {
+          body.dataset.voice = voice;
+          body.title = "クリックしてボイスを再生";
+          body.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            replayVoice(voice);
+          });
+        }
+        container.append(speaker, body);
+        return;
+      }
+      appendHistoryLines(container, transformNekomimiText(text));
+    }
+
+    function appendHistoryLines(container, text) {
+      text.split("\n").forEach((line, index, lines) => {
+        container.append(document.createTextNode(line));
+        if (index < lines.length - 1) container.append(document.createElement("br"));
+      });
+    }
+
+    function closeHistory() {
+      if (historyDialog.open) historyDialog.close();
+    }
+
+    async function renderSaveManager(providedSlots) {
+      const slots = providedSlots || await window.frames.sys.getSaveSlots();
+      const firstSlot = savePage * 6;
+      slotGrid.replaceChildren();
+      for (let index = firstSlot; index < firstSlot + 6; index += 1) {
+        const slotNumber = index + 1;
+        const record = slots[index];
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "save-slot";
+        button.disabled = saveMode === "load" && !record;
+        const preview = record?.thumbnail ? `<img src="${record.thumbnail}" alt="セーブ時の背景">` : "NO DATA";
+        const date = record ? new Date(record.savedAt).toLocaleString("ja-JP") : "空きスロット";
+        const scene = record ? transformNekomimiText(record.sceneLabel || `シーン ${record.page} / ${record.line}`) : "新しく保存できます";
+        button.innerHTML = `<span class="slot-preview">${preview}</span><span><span class="slot-number">SLOT ${String(slotNumber).padStart(2, "0")}</span><span class="slot-date">${date}</span><span class="slot-scene"></span></span>`;
+        button.querySelector(".slot-scene").textContent = scene;
+        button.addEventListener("click", () => selectSaveSlot(slotNumber, record));
+        slotGrid.append(button);
+      }
+      savePager.replaceChildren();
+      savePager.append(createPageArrow("前のページ", "←", -1, savePage === 0));
+      for (let page = 0; page < 10; page += 1) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `page-button${page === savePage ? " active" : ""}`;
+        button.textContent = String(page + 1);
+        button.setAttribute("aria-label", `${page + 1}ページ`);
+        button.addEventListener("click", () => {
+          if (savePage !== page) playSystemSound("page");
+          savePage = page;
+          renderSaveManager();
+        });
+        savePager.append(button);
+      }
+      savePager.append(createPageArrow("次のページ", "→", 1, savePage === 9));
+    }
+
+    function createPageArrow(label, mark, direction, disabled) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "page-button page-arrow";
+      button.textContent = mark;
+      button.setAttribute("aria-label", label);
+      button.disabled = disabled;
+      button.addEventListener("click", () => changeSavePage(direction));
+      return button;
+    }
+
+    function changeSavePage(direction) {
+      const nextPage = Math.max(0, Math.min(9, savePage + direction));
+      if (nextPage === savePage) return;
+      savePage = nextPage;
+      playSystemSound("page");
+      renderSaveManager();
+    }
+
+    async function selectSaveSlot(slotNumber, record) {
+      if (saveMode === "save") {
+        if (record && !await showUiDialog({title:"セーブデータの上書き",message:`スロット${slotNumber}のセーブデータを上書きしますか？`,confirmText:"上書きする"})) return;
+        if (await window.frames.sys.saveSlot(slotNumber)) {
+          localStorage.setItem(lastSaveLoadSlotKey, String(slotNumber));
+          playSystemSound("save");
+          saveDialog.close();
+        }
+        return;
+      }
+      if (await window.frames.sys.loadSlot(slotNumber)) {
+        localStorage.setItem(lastSaveLoadSlotKey, String(slotNumber));
+        playSystemSound("load");
+        saveDialog.close();
+      }
+    }
+
+    setGameMode(window.gameMode);
+    updateImageEffectButtons();
+    updateSkipUnreadButtons();
+    musicVolume.value = localStorage.getItem("Time2:MusicVolume") || "8";
+    musicMute.checked = localStorage.getItem("Time2:MusicMuted") === "true";
+    voiceVolume.value = localStorage.getItem("Time2:VoiceVolume") || "8";
+    voiceMute.checked = localStorage.getItem("Time2:VoiceMuted") === "true";
+    systemSoundVolume.value = localStorage.getItem("Time2:SystemSoundVolume") || "8";
+    systemSoundMute.checked = localStorage.getItem("Time2:SystemSoundMuted") === "true";
+    scenarioSoundVolume.value = localStorage.getItem("Time2:ScenarioSoundVolume") || "8";
+    scenarioSoundMute.checked = localStorage.getItem("Time2:ScenarioSoundMuted") === "true";
+    fontSize.value = String(window.fontSizeLevel);
+    fontSizeValue.value = String(window.fontSizeLevel);
+    fontSizeValue.textContent = String(window.fontSizeLevel);
+    applyAudioSettings();
+    applyVoiceSettings();
+    applySystemSoundSettings();
+    applyScenarioSoundSettings();
+    updateTitleMenuState();
+    playTitleBgm();
+  </script>
+</body>
+</html>

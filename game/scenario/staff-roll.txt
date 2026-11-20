@@ -1,0 +1,60 @@
+# スタッフロール編集ファイル
+# [credit] は通常項目、[final] は最後に停止する項目です。
+# 区切りの次の行が担当名、その後が氏名・詳細です。
+# 担当名を空欄にするときは「-」を指定してください。
+[credit]
+-
+時の封土
+Credits
+
+[credit]
+シナリオ原案
+「時の封土」
+（PC-98用 DOSアプリケーション）
+By MAKIO
+
+[credit]
+プログラミング
+MAKIO
+Codex(OpenAI)
+
+[credit]
+美術・CG製作
+まきお
+
+[credit]
+音響・音楽監修
+マキヲ
+
+[credit]
+画像素材提供
+インプレス
+H2 Soft
+JNR-TAMA
+A&Pコーディネータージャパン
+G-Tool
+ChatGPT(OpenAI)
+
+[credit]
+音楽素材提供
+インプレス
+Cubic Energy
+Office dop
+Music Clipboard（大石輝恭様）
+FreeMusicArchive
+HN Corporation
+Suno-AI Music Generator
+ElevenLabs
+
+
+
+
+[final]
+
+企画・制作
+Pleiades Company
+
+Presented by MAKIO 1999-2026
+All Rights Reserved.
+
+Fin.

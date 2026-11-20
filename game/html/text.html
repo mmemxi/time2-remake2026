@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>メッセージ</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent;
+      -webkit-user-select: none; user-select: none;
+      -webkit-user-drag: none;
+    }
+    body { color: #f5f7fa; font: 600 var(--story-font-size, 19px)/1.7 "Yu Gothic UI", "Meiryo", sans-serif; }
+    a { color: inherit; text-decoration: none; }
+    .message-screen, .choice-screen { position: relative; width: 100%; height: 100%; }
+    .message-window {
+      position: absolute;
+      left: 4%; right: 4%; bottom: 3%;
+      height: calc(6.8em + 32px);
+      overflow: visible;
+      padding: 16px clamp(20px, 4vw, 42px);
+      border: 1px solid rgba(190, 220, 240, .6);
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(9, 17, 27, .92), rgba(16, 28, 42, .86));
+      box-shadow: 0 12px 36px rgba(0, 0, 0, .55), inset 0 1px rgba(255, 255, 255, .08);
+      backdrop-filter: blur(9px);
+    }
+    .message-viewport { height: 6.8em; padding-right: 38px; overflow: hidden; }
+    .message-content {
+      height: 100%; text-align: left; white-space: pre-wrap; overflow: hidden;
+      line-break: strict; word-break: normal; overflow-wrap: anywhere;
+    }
+    .dialogue-nameplate {
+      position: absolute;
+      left: 18px;
+      top: 0;
+      min-width: 7em;
+      max-width: min(48%, 18em);
+      padding: 6px 17px;
+      transform: translateY(-62%);
+      overflow: hidden;
+      border: 1px solid rgba(177, 211, 229, .62);
+      border-radius: 8px;
+      color: #fff;
+      background: linear-gradient(180deg, rgba(32, 49, 63, .97), rgba(13, 24, 34, .97));
+      box-shadow: 0 5px 18px rgba(0, 0, 0, .42), inset 0 1px rgba(255, 255, 255, .08);
+      font-size: .82em;
+      line-height: 1.35;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .dialogue-nameplate[hidden] { display: none; }
+    .message-close-button { position: absolute; top: 8px; right: 9px; z-index: 2; width: 25px; height: 25px; display: grid; place-items: center; padding: 0; border: 1px solid rgba(196,220,234,.65); border-radius: 50%; color: rgba(239,247,251,.86); background: rgba(13,25,36,.7); box-shadow: 0 2px 8px rgba(0,0,0,.35); font: 500 18px/1 "Yu Gothic UI","Meiryo",sans-serif; cursor: pointer; }
+    .message-close-button:hover, .message-close-button:focus-visible { color: #fff; border-color: #a9e8fa; background: rgba(34,65,82,.94); outline: none; }
+    .message-wait-indicator { position: absolute; right: 10px; bottom: 8px; width: 18px; height: 18px; object-fit: contain; pointer-events: none; }
+    .dialogue-body { color: inherit; }
+    .dialogue-body[data-voice] { cursor: pointer; }
+    .dialogue-body[data-voice]:hover { color: inherit; text-decoration: underline; text-decoration-color: rgba(238,246,250,.48); }
+    .read-message .message-content { color: #b7bec6; }
+    .read-message .dialogue-body { color: inherit; }
+    .message-content > :first-child { margin-top: 0; }
+    .message-content > :last-child { margin-bottom: 0; }
+    body.story-hidden .message-window, body.story-hidden .choice-screen { visibility: hidden; }
+    .message-window table, .choice-context table { width: 100% !important; height: auto !important; }
+    .message-window font, .choice-context font { font-size: inherit; }
+    .choice-screen { display: grid; place-items: center; padding: 7%; background: rgba(0, 0, 0, .18); }
+    .choice-screen[hidden], .message-screen[hidden] { display: none; }
+    body.visual-only-wait .message-screen { display: none; }
+    .choice-panel { width: min(82%, 720px); display: grid; gap: 12px; }
+    .choice-context { margin-bottom: 10px; text-align: center; text-shadow: 0 2px 8px #000; }
+    .story-choice {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 2.3em 1fr;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      border: 1px solid rgba(181, 218, 240, .7);
+      border-radius: 12px;
+      color: #f7fbff;
+      background: linear-gradient(120deg, rgba(16, 31, 47, .94), rgba(25, 48, 68, .9));
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .42);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease;
+    }
+    .story-choice:hover, .story-choice:focus-visible {
+      transform: translateY(-2px);
+      border-color: #9be8ff;
+      background: linear-gradient(120deg, rgba(25, 56, 79, .98), rgba(33, 78, 103, .95));
+      outline: none;
+    }
+    .choice-number { display: grid; place-items: center; width: 2em; height: 2em; border-radius: 50%; background: #9be8ff; color: #09202c; font-size: .76em; }
+    .operation-guide { position: fixed; top: 2%; right: 2.5%; z-index: 5; padding: 5px 9px; border-radius: 7px; color: rgba(225,235,241,.62); background: rgba(4,8,12,.38); font-size: 11px; font-weight: 500; letter-spacing: .04em; pointer-events: none; }
+    body.story-hidden .operation-guide { visibility: hidden; }
+  </style>
+</head>
+<body>
+  <script>
+    document.write(top.sys.drawtext()+"<aside class='operation-guide'>クリック／テンキー0／ホイール↓：次へ　右クリック：非表示　ホイール↑：履歴</aside>");
+    document.addEventListener("keydown", keyin);
+    document.addEventListener("keyup", keyup);
+    document.addEventListener("pointerdown", stopShakeBeforePointerClick, {capture:true});
+    document.addEventListener("click", handleScreenClick);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("wheel", handleWheel, { passive: false });
+    document.addEventListener("selectstart", preventSelection);
+    document.addEventListener("dragstart", preventSelection);
+
+    let messageHidden = false;
+    let messagePage = 0;
+    let messagePages = [];
+    let messageUnits = top.sys.currentTextUnits || [];
+    let messageUnitIndex = 0;
+    let currentUnit = null;
+    let choicesVisible = false;
+    let originalStoryText = null;
+    let lastWheelAdvanceAt = 0;
+    let fadeContinuation = null;
+    let suppressClickAfterShakePointer = false;
+    let suppressClickAfterShakeTimer = 0;
+    let shakeAdvancePending = false;
+
+    refreshStoryView(top.pendingTextResumeState || null, false);
+    top.pendingTextResumeState = null;
+
+    function refreshStoryView(resumeState = null, rebuildMarkup = true) {
+      if (rebuildMarkup) synchronizeStoryMarkup();
+      top.pendingTextResumeState = null;
+      top.setStoryUiBlocked(false);
+      document.body.classList.remove("story-hidden", "visual-only-wait");
+      messageHidden = false;
+      messagePage = 0;
+      messagePages = [];
+      messageUnits = top.sys.currentTextUnits || [];
+      messageUnitIndex = 0;
+      currentUnit = null;
+      choicesVisible = false;
+      originalStoryText = null;
+      fadeContinuation = null;
+      applyFontSize(top.fontSizeLevel || 3, false);
+      const messageScreen = document.querySelector(".message-screen");
+      const choiceScreen = document.querySelector(".choice-screen");
+      if (messageScreen) messageScreen.hidden = false;
+      if (choiceScreen) choiceScreen.hidden = true;
+      if (resumeState?.choicesVisible && top.sys.scnt > 1) showChoices();
+      else if (messageUnits.length) {
+        loadMessageUnit(Math.max(0, Math.min(messageUnits.length - 1, Number(resumeState?.messageUnitIndex) || 0)));
+        if (resumeState && Number(resumeState.messagePage) > 0) {
+          messagePage = Math.min(messagePages.length - 1, Number(resumeState.messagePage));
+          showMessagePage();
+        }
+      }
+      else if (top.sys.scnt > 1) showChoices();
+      else if (top.sys.scnt === 1) document.body.classList.add("visual-only-wait");
+    }
+
+    function synchronizeStoryMarkup() {
+      const template = document.createElement("template");
+      template.innerHTML = top.sys.drawtext();
+      const incomingMessage = template.content.querySelector(".message-screen");
+      const incomingChoice = template.content.querySelector(".choice-screen");
+      let currentMessage = document.querySelector(".message-screen");
+      const currentChoice = document.querySelector(".choice-screen");
+      const guide = document.querySelector(".operation-guide");
+      if (!currentMessage && incomingMessage) {
+        currentMessage = incomingMessage;
+        document.body.insertBefore(currentMessage, guide || document.body.firstChild);
+      }
+      if (currentChoice) currentChoice.remove();
+      if (incomingChoice) document.body.insertBefore(incomingChoice, guide || null);
+    }
+
+    window.refreshStoryView = refreshStoryView;
+
+    function exportTextResumeState() {
+      return {messageUnitIndex, messagePage, choicesVisible};
+    }
+
+    function applyFontSize(level, repaginate = true) {
+      const sizes = [15, 17, 19, 21, 23];
+      const safeLevel = Math.max(1, Math.min(5, Number(level) || 3));
+      document.documentElement.style.setProperty("--story-font-size", `${sizes[safeLevel - 1]}px`);
+      if (repaginate && !choicesVisible) prepareMessagePages();
+    }
+
+    function goline(lineNumber) {
+      top.sys.clrtxt();
+      top.MAIN.line(lineNumber);
+      window.focus();
+    }
+
+    function gopage(pageNumber, lineNumber) {
+      top.sys.clrtxt();
+      top.sys.goit(pageNumber, lineNumber);
+      window.focus();
+    }
+
+    function activateChoice(index) {
+      const lineNumber = top.sys.selt1[index];
+      const pageNumber = top.sys.selt2[index];
+      if (lineNumber === -1) return;
+      if (top.sys.scnt > 1 && typeof top.playSystemSound === "function") top.playSystemSound("choiceClick");
+      top.stopVoice();
+      top.sys.markCurrentMessageRead();
+      top.sys.recordChoiceHistory(index);
+      pageNumber === 0 ? goline(lineNumber) : gopage(pageNumber, lineNumber);
+    }
+
+    function handleScreenClick(event) {
+      if (suppressClickAfterShakePointer) {
+        suppressClickAfterShakePointer = false;
+        window.clearTimeout(suppressClickAfterShakeTimer);
+        suppressClickAfterShakeTimer = 0;
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      processScreenActivation(event);
+    }
+
+    function processScreenActivation(event) {
+      if (event.target.closest(".story-choice")) return;
+      if (event.target.closest(".message-close-button")) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof top.playSystemSound === "function") top.playSystemSound("cancel");
+        setMessageHidden(true);
+        return;
+      }
+      const voiceBody = event.target.closest(".dialogue-body[data-voice]");
+      if (voiceBody) {
+        event.preventDefault();
+        event.stopPropagation();
+        top.replayVoice(voiceBody.dataset.voice);
+        return;
+      }
+      advanceStory();
+    }
+
+    function stopShakeBeforePointerClick(event) {
+      if (event.button !== undefined && event.button !== 0) return;
+      const shaking = typeof top.isScreenShakeActive === "function" && top.isScreenShakeActive();
+      if (!shaking) {
+        suppressClickAfterShakePointer = false;
+        window.clearTimeout(suppressClickAfterShakeTimer);
+        suppressClickAfterShakeTimer = 0;
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      if (shakeAdvancePending) return;
+      shakeAdvancePending = true;
+      suppressClickAfterShakePointer = true;
+      window.clearTimeout(suppressClickAfterShakeTimer);
+      suppressClickAfterShakeTimer = window.setTimeout(() => {
+        suppressClickAfterShakePointer = false;
+        suppressClickAfterShakeTimer = 0;
+      }, 180);
+      top.stopScreenShake();
+      // Restore the shell before a terminal action (for example @gameover)
+      // replaces the story layers. Doing both inside pointerdown can drop the
+      // terminal transition while the animation is being cancelled.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        shakeAdvancePending = false;
+        advanceStory();
+      }));
+    }
+
+    function advanceStory() {
+      if (typeof top.stopScreenShake === "function") top.stopScreenShake();
+      if (messageHidden) { setMessageHidden(false); return; }
+      if (choicesVisible) return;
+      const content = document.querySelector(".message-content");
+      if (!content) return;
+      if (typeof top.playSystemSound === "function") top.playSystemSound("message");
+      if (messagePage < messagePages.length - 1) {
+        messagePage += 1;
+        showMessagePage();
+        return;
+      }
+      advanceMessageUnit();
+    }
+
+    function advanceMessageUnit() {
+      top.stopVoice();
+      top.sys.markCurrentMessageRead();
+      if (currentUnit?.fadeAfter) {
+        fadeContinuation = messageUnitIndex < messageUnits.length - 1
+          ? {type:"message", index:messageUnitIndex + 1}
+          : {type:"terminal"};
+        top.startScreenFade(currentUnit.fadeAfter);
+        return;
+      }
+      if (messageUnitIndex < messageUnits.length - 1) {
+        loadMessageUnit(messageUnitIndex + 1);
+        return;
+      }
+      finishMessageSequence();
+    }
+
+    function finishMessageSequence() {
+      if (top.MAIN && typeof top.MAIN.applyPendingPresentation === "function") top.MAIN.applyPendingPresentation();
+      if (top.sys.deferredFadePending !== null) {
+        const fadeRequest = top.sys.deferredFadePending;
+        top.sys.deferredFadePending = null;
+        top.startScreenFade(fadeRequest);
+        return;
+      }
+      if (top.sys.gameOverPending) {
+        top.showGameOver();
+        return;
+      }
+      if (top.sys.exitPending) {
+        top.startExitToTitle();
+        return;
+      }
+      if (top.sys.scnt > 1) showChoices();
+      else if (top.sys.scnt === 1) activateChoice(1);
+    }
+
+    function advanceAfterScreenFade() {
+      if (fadeContinuation) {
+        const continuation = fadeContinuation;
+        fadeContinuation = null;
+        if (continuation.type === "message") loadMessageUnit(continuation.index);
+        else finishMessageSequence();
+        return true;
+      }
+      if (choicesVisible || top.sys.scnt !== 1) return false;
+      top.sys.skipVisualEffect = true;
+      activateChoice(1);
+      return true;
+    }
+
+    function loadMessageUnit(index) {
+      const content = document.querySelector(".message-content");
+      const messageScreen = document.querySelector(".message-screen");
+      const nameplate = document.querySelector(".dialogue-nameplate");
+      const messageWindow = document.querySelector(".message-window");
+      if (!content || !messageUnits[index]) return;
+      top.stopVoice();
+      messageUnitIndex = index;
+      currentUnit = messageUnits[index];
+      if (top.MAIN && typeof top.MAIN.applyMessagePresentation === "function") top.MAIN.applyMessagePresentation(currentUnit.presentationStage);
+      originalStoryText = displayNekomimiText(currentUnit.text || "");
+      const isRead = top.sys.setCurrentMessage(currentUnit.key);
+      if (messageScreen) messageScreen.classList.toggle("read-message", isRead);
+      const dialogue = currentUnit.type === "dialogue";
+      if (nameplate) {
+        nameplate.hidden = !dialogue;
+        nameplate.textContent = dialogue ? displayNekomimiText(currentUnit.speaker) : "";
+      }
+      if (messageWindow) messageWindow.classList.toggle("dialogue-window", dialogue);
+      updateWaitIndicator();
+      top.sys.recordMessageHistory(currentUnit);
+      prepareMessagePages();
+      if (currentUnit.type === "dialogue" && currentUnit.voice) top.playVoice(currentUnit.voice);
+    }
+
+    function prepareMessagePages() {
+      const content = document.querySelector(".message-content");
+      if (!content) return;
+      const storyText = originalStoryText || "";
+      if (!storyText.trim() && top.sys.scnt > 1) {
+        messagePages = [];
+        showChoices();
+        return;
+      }
+      messagePages = [];
+      const forcedPageSections = currentUnit?.type === "text" ? storyText.split("\uE000") : [storyText];
+      forcedPageSections.forEach((section) => appendAutomaticPages(wrapStoryLines(section, content)));
+      if (!messagePages.length) messagePages.push([]);
+      messagePage = 0;
+      showMessagePage();
+    }
+
+    function appendAutomaticPages(visualLines) {
+      while (visualLines.length) {
+        while (visualLines.length && !storyLineText(visualLines[0]).trim()) visualLines.shift();
+        if (!visualLines.length) break;
+        const pageLines = visualLines.splice(0, 4);
+        while (pageLines.length && !storyLineText(pageLines[pageLines.length - 1]).trim()) pageLines.pop();
+        if (pageLines.some((line) => storyLineText(line).trim())) messagePages.push(pageLines);
+      }
+    }
+
+    function wrapStoryLines(text, content) {
+      const style = getComputedStyle(content);
+      const maxWidth = Math.max(1, content.clientWidth);
+      const result = [];
+      const logicalLines = currentUnit?.type === "dialogue"
+        ? displayNekomimiText(currentUnit.body).split("\n").map((bodyLine) => [{ text: bodyLine, role: "body" }])
+        : text.split("\n").map((logicalLine) => [{ text: logicalLine, role: "" }]);
+      const measurer = document.createElement("div");
+      Object.assign(measurer.style, {
+        position: "fixed",
+        left: "-10000px",
+        top: "0",
+        width: `${maxWidth}px`,
+        margin: "0",
+        padding: "0",
+        border: "0",
+        visibility: "hidden",
+        pointerEvents: "none",
+        whiteSpace: "pre-wrap",
+        lineBreak: "strict",
+        wordBreak: "normal",
+        overflowWrap: "anywhere",
+        font: style.font,
+        letterSpacing: style.letterSpacing,
+        textIndent: "0"
+      });
+      document.body.append(measurer);
+      logicalLines.forEach((sourceSegments) => {
+        if (!sourceSegments.some((segment) => segment.text)) { result.push([]); return; }
+        measurer.replaceChildren();
+        const textNodes = [];
+        sourceSegments.forEach((segment) => {
+          const span = document.createElement("span");
+          const textNode = document.createTextNode(segment.text);
+          span.append(textNode);
+          measurer.append(span);
+          textNodes.push({textNode, role: segment.role});
+        });
+        let currentTop = null;
+        let currentLine = null;
+        textNodes.forEach(({textNode, role}) => {
+          let utf16Offset = 0;
+          Array.from(textNode.data).forEach((character) => {
+            const range = document.createRange();
+            range.setStart(textNode, utf16Offset);
+            utf16Offset += character.length;
+            range.setEnd(textNode, utf16Offset);
+            const rectangle = range.getBoundingClientRect();
+            if (currentTop === null || Math.abs(rectangle.top - currentTop) > 1) {
+              currentTop = rectangle.top;
+              currentLine = [];
+              result.push(currentLine);
+            }
+            const lastSegment = currentLine.at(-1);
+            if (lastSegment && lastSegment.role === role) lastSegment.text += character;
+            else currentLine.push({text: character, role});
+          });
+        });
+      });
+      measurer.remove();
+      return applyJapaneseLineRules(result);
+    }
+
+    function applyJapaneseLineRules(lines) {
+      for (let index = 1; index < lines.length; index += 1) {
+        const previous = lines[index - 1];
+        const current = lines[index];
+        if (!previous.length || !current.length) continue;
+        while (current.length && previous.length && isForbiddenAtLineStart(firstLineCharacter(current))) {
+          const moved = takeLastLineCharacter(previous);
+          if (!moved) break;
+          prependLineCharacter(current, moved);
+        }
+        while (previous.length && isForbiddenAtLineEnd(lastLineCharacter(previous))) {
+          const moved = takeLastLineCharacter(previous);
+          if (!moved) break;
+          prependLineCharacter(current, moved);
+        }
+      }
+      return lines;
+    }
+
+    function firstLineCharacter(line) { return Array.from(line[0]?.text || "")[0] || ""; }
+    function lastLineCharacter(line) { return Array.from(line.at(-1)?.text || "").at(-1) || ""; }
+    function takeFirstLineCharacter(line) {
+      const segment = line[0];
+      if (!segment) return null;
+      const characters = Array.from(segment.text);
+      const character = characters.shift();
+      const moved = { character, role: segment.role };
+      segment.text = characters.join("");
+      if (!segment.text) line.shift();
+      return moved;
+    }
+    function takeLastLineCharacter(line) {
+      const segment = line.at(-1);
+      if (!segment) return null;
+      const characters = Array.from(segment.text);
+      const character = characters.pop();
+      const moved = { character, role: segment.role };
+      segment.text = characters.join("");
+      if (!segment.text) line.pop();
+      return moved;
+    }
+    function appendLineCharacter(line, moved) {
+      const segment = line.at(-1);
+      if (segment && segment.role === moved.role) segment.text += moved.character;
+      else line.push({ text: moved.character, role: moved.role });
+    }
+    function prependLineCharacter(line, moved) {
+      const segment = line[0];
+      if (segment && segment.role === moved.role) segment.text = moved.character + segment.text;
+      else line.unshift({ text: moved.character, role: moved.role });
+    }
+
+    function isForbiddenAtLineStart(character) {
+      return /[、。，．・：；？！!?,.:;゛゜ヽヾゝゞ々ー―‐…‥）〕］｝〉》」』】〙〗〟’”｠»)]}\u3041\u3043\u3045\u3047\u3049\u3063\u3083\u3085\u3087\u308e\u30a1\u30a3\u30a5\u30a7\u30a9\u30c3\u30e3\u30e5\u30e7\u30ee\u30f5\u30f6]/.test(character);
+    }
+
+    function isForbiddenAtLineEnd(character) {
+      return /[（〔［｛〈《「『【〘〖〝‘“｟«([{]/.test(character);
+    }
+
+    function storyLineText(line) {
+      return line.map((segment) => segment.text).join("");
+    }
+
+    function displayNekomimiText(value) {
+      return typeof top.transformNekomimiText === "function"
+        ? top.transformNekomimiText(value)
+        : String(value ?? "");
+    }
+
+    function updateWaitIndicator() {
+      const indicator = document.querySelector(".message-wait-indicator");
+      if (!indicator) return;
+      const file = top.nekomimiMode ? "wait-cat.gif" : "wait-click.gif";
+      const nextSource = `../resource/ui/${file}`;
+      if (!indicator.src.endsWith(`/resource/ui/${file}`)) indicator.src = nextSource;
+    }
+
+    function showMessagePage() {
+      const content = document.querySelector(".message-content");
+      if (!content) return;
+      content.replaceChildren();
+      const page = messagePages[messagePage] || [];
+      page.forEach((line, lineIndex) => {
+        line.forEach((segment) => {
+          const span = document.createElement("span");
+          if (segment.role) span.className = `dialogue-${segment.role}`;
+          if (segment.role === "body" && currentUnit?.type === "dialogue" && currentUnit.voice) span.dataset.voice = currentUnit.voice;
+          span.textContent = segment.text;
+          content.append(span);
+        });
+        if (lineIndex < page.length - 1) content.append(document.createElement("br"));
+      });
+    }
+
+    function showChoices() {
+      const messageScreen = document.querySelector(".message-screen");
+      const choiceScreen = document.querySelector(".choice-screen");
+      if (!choiceScreen) return;
+      if (top.MAIN && typeof top.MAIN.applyPendingPresentation === "function") top.MAIN.applyPendingPresentation();
+      top.sys.markCurrentMessageRead();
+      choicesVisible = true;
+      if (messageScreen) messageScreen.hidden = true;
+      choiceScreen.hidden = false;
+      const firstChoice = choiceScreen.querySelector(".story-choice");
+      if (firstChoice) firstChoice.focus();
+    }
+
+    function handleContextMenu(event) {
+      event.preventDefault();
+      if (!document.querySelector(".message-window, .choice-screen")) return;
+      if (typeof top.playSystemSound === "function") top.playSystemSound("cancel");
+      setMessageHidden(!messageHidden);
+    }
+
+    function setMessageHidden(hidden) {
+      if (typeof top.stopScreenShake === "function") top.stopScreenShake();
+      messageHidden = hidden;
+      document.body.classList.toggle("story-hidden", hidden);
+      top.setStoryUiBlocked(hidden);
+    }
+
+    function toggleMessageVisibility() {
+      if (!document.querySelector(".message-window, .choice-screen")) return;
+      setMessageHidden(!messageHidden);
+    }
+
+    function handleWheel(event) {
+      if (!event.deltaY) return;
+      event.preventDefault();
+      if (event.deltaY < 0) {
+        if (!messageHidden) top.openHistory();
+        return;
+      }
+      const now = performance.now();
+      if (now - lastWheelAdvanceAt < 180) return;
+      lastWheelAdvanceAt = now;
+      advanceStory();
+    }
+
+    function skipCurrentMessage() {
+      if (typeof top.stopScreenShake === "function") top.stopScreenShake();
+      if (choicesVisible) return false;
+      if (!top.skipUnreadMessages && !top.sys.currentMessageRead) return "unread";
+      if (messagePage < messagePages.length - 1) {
+        messagePage = messagePages.length - 1;
+        showMessagePage();
+      }
+      if (messageUnitIndex < messageUnits.length - 1) {
+        top.sys.markCurrentMessageRead();
+        loadMessageUnit(messageUnitIndex + 1);
+        return true;
+      }
+      if (top.MAIN && typeof top.MAIN.applyPendingPresentation === "function") top.MAIN.applyPendingPresentation();
+      if (top.sys.gameOverPending) {
+        top.showGameOver();
+        return false;
+      }
+      if (top.sys.scnt > 1) {
+        top.sys.markCurrentMessageRead();
+        showChoices();
+        return false;
+      }
+      if (top.sys.scnt !== 1) return false;
+      top.sys.markCurrentMessageRead();
+      top.sys.skipVisualEffect = true;
+      activateChoice(1);
+      return true;
+    }
+
+    function keyin(event) {
+      if (event.target.closest?.(".message-close-button") && (event.key === "Enter" || event.key === " ")) return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        window.getSelection()?.removeAllRanges();
+        return;
+      }
+      if (event.key === "Control") {
+        event.preventDefault();
+        top.setControlSkip(true);
+        return;
+      }
+      if (event.key === "Escape") {
+        if (document.querySelector(".message-window, .choice-screen")) {
+          event.preventDefault();
+          if (typeof top.playSystemSound === "function") top.playSystemSound("cancel");
+          setMessageHidden(!messageHidden);
+        }
+        return;
+      }
+      const keyCode = event.keyCode || event.which;
+      if (event.code === "Numpad0" || keyCode === 96) {
+        event.preventDefault();
+        advanceStory();
+        return;
+      }
+      let buttonNumber = keyCode - 96;
+      if (keyCode === 13) top.startButtonSkip();
+      if (buttonNumber >= 1 && buttonNumber <= 9) {
+        const lineNumber = top.sys.selt1[buttonNumber];
+        const pageNumber = top.sys.selt2[buttonNumber];
+        if (lineNumber !== -1) activateChoice(buttonNumber);
+      }
+    }
+
+    function keyup(event) {
+      if (event.key === "Control") top.setControlSkip(false);
+    }
+
+    function preventSelection(event) {
+      event.preventDefault();
+      window.getSelection()?.removeAllRanges();
+    }
+
+    let lastChoiceFocus = null;
+    function playChoiceFocus(event) {
+      const choice = event.target.closest?.(".story-choice");
+      if (!choice || choice === lastChoiceFocus && event.type === "focusin") return;
+      if (event.type === "pointerover" && event.relatedTarget && choice.contains(event.relatedTarget)) return;
+      lastChoiceFocus = choice;
+      if (typeof top.playSystemSound === "function") top.playSystemSound("choiceFocus");
+    }
+    document.addEventListener("pointerover", playChoiceFocus, true);
+    document.addEventListener("focusin", playChoiceFocus, true);
+  </script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+# 音楽モード定義（UTF-8／タブ区切り）
+# 記載順が画面の表示順です。
+# MP3ファイル名<TAB>曲名<TAB>制作者<TAB>解説
+title.mp3	戻れない昔	Suno-AI Music Generator	タイトル曲・メインテーマ
+bgm0.mp3	回想	Cubic Energy	導入・オープニング（旧）
+evading_the_horizon.mp3	回想	Suno-AI Music Generator	導入・オープニング（新）
+bgm1.mp3	残影	大石輝恭様	マルティーナ先生の家
+bgm2.mp3	精神の森	大石輝恭様	忘却の塔～精神の森
+bgm3.mp3	迷いの草原	IBE様	迷いの草原
+bgm4.mp3	湿原地帯	川田康友様	ラーナとマルティーナ先生の家
+bgm5.mp3	失望の岬	Cubic Energy	失望の岬
+bgm6.mp3	消失の島	N.Minowa様	消失の島
+bgm7.mp3	城門の試煉	Cubic Energy	人面像との対決
+bgm8.mp3	時の王の城	Cubic Energy	時の王の城
+bgm9.mp3	清算の間	インプレス	清算の間
+bgm10.mp3	レモンイエローの吐息	Sei Kaitani様	おまけ・特別付録
+trans.mp3	時空移動	Neptune Music Development	時の封土への転移
+lana.mp3	ラーナ	Edirol Mi様	ラーナのテーマ
+desease.mp3	病める魂	インプレス	病に侵された彼女
+rava.mp3	ラバステーラ	Neptune Music Development	ラバステーラのテーマ
+talk.mp3	森の住民	インプレス	精神の森の住民との会話
+chase.mp3	逃走シーン	Cubic Energy	ラバステーラに追われる二人
+over.mp3	作戦失敗	YAMAHA	ラバステーラから逃げるのに失敗
+gameover.mp3	侵入者	Suno-AI Music Generator	人面像からの質問に失敗
+child.mp3	謁見の間	野口達彦様	時の王との謁見
+goodby.mp3	いずれ来る離別	Roland Corporation	離別の橋がもたらす運命
+end0.mp3	将来は見えない	インプレス	エンディング4
+end1.mp3	愛は時を超えて	かみきくん様	エンディング1
+globalskip.mp3	戻れない昔（オルゴール）	Suno-AI Music Generator	マルティーナ先生とラーナの生活
+maintheme(orchestra).mp3	戻れない昔(オーケストラ)	Suno-AI Music Generator	メインテーマ（オーケストラ版）
+maintheme(piano).mp3	戻れない昔(ピアノ)	Suno-AI Music Generator	メインテーマ（ピアノ版）

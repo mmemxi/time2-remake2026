@@ -1,0 +1,322 @@
+<!doctype html><html lang="ja"><head>
+<meta charset="utf-8">
+<title>MakiScriptコントロール</title>
+<style>
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none}html,body{margin:0;height:100%;overflow:hidden;background:#0d1219;color:#dce8f1;font:12px "Yu Gothic UI","Meiryo",sans-serif}
+form{height:100%;display:flex;align-items:center;justify-content:flex-end;gap:9px;padding:7px 14px}
+button{min-height:34px;border:1px solid #3b5061;border-radius:8px;padding:7px 18px;color:#dce8f1;background:#172431;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600}button:hover{border-color:#76d5ef;background:#20384a}button.active{border-color:#76d9ef;color:#07161c;background:#76d9ef}.settings-button{border-color:#496270;background:#1b2d38}
+.item-button{display:inline-flex;align-items:center;justify-content:center;gap:8px}.item-button[hidden]{display:none}.item-count{min-width:22px;height:22px;display:inline-grid;place-items:center;padding:0 6px;border:2px solid #7bd8ee;border-radius:999px;color:#a9efff;background:#0c1b24;font-size:11px;line-height:1;font-variant-numeric:tabular-nums}.item-button.item-increase{animation:item-button-increase .42s ease-in-out 7}.item-button.item-decrease{animation:item-button-decrease .42s ease-in-out 7}@keyframes item-button-increase{0%,100%{border-color:#3b5061;color:#dce8f1;background:#172431;box-shadow:none}50%{border-color:#ffb45d;color:#fff2df;background:#724117;box-shadow:0 0 17px rgba(255,145,43,.88)}}@keyframes item-button-decrease{0%,100%{border-color:#3b5061;color:#dce8f1;background:#172431;box-shadow:none}50%{border-color:#83e7ff;color:#e9fbff;background:#164f65;box-shadow:0 0 17px rgba(83,207,244,.88)}}
+</style></head>
+<body>
+<form name="FORM2">
+<input name="C_GRP" checked type="checkbox" hidden>
+<input name="C_BGM" checked type="checkbox" hidden>
+<button type="button" data-menu-save onClick="save()">セーブ</button>
+<button type="button" data-menu-load onClick="load()">ロード</button>
+<button type="button" data-skip-button onClick="top.startButtonSkip()">スキップ</button>
+<button type="button" data-menu-history onClick="top.openHistory()">履歴</button>
+<button type="button" class="item-button" data-menu-items onClick="top.openItemInventory()"><span>アイテム</span><span class="item-count" data-item-count>0</span></button>
+<button type="button" class="settings-button" data-menu-settings onClick="top.handleSystemMenuAction()">設定</button>
+</form>
+<script src="../js/save.js?v=20261118-saveisolation1"></script>
+<script src="../js/draw.js?v=20261020-text-refresh1"></script>
+<script language="JavaScript">
+document.addEventListener("selectstart",function(event){event.preventDefault()});
+document.addEventListener("dragstart",function(event){event.preventDefault()});
+document.addEventListener("contextmenu",function(event){event.preventDefault()},{capture:true});
+selt1=new Array(10);
+selt2=new Array(10);
+// ======================================================================
+function clr() { gcnt=0;drawcnt=0;}
+function clrtxt() { tcnt=0;scnt=0;gameOverPending=false;endingPending=null;screenFadePending=null;deferredFadePending=null;exitPending=false;pendingPresentationStage=null;}
+function appUrl(file)
+	{
+	var url=new URL("html/"+file,top.location.href);
+	url.searchParams.set("v","20261119-shake-terminal2");
+	return url.href;
+	}
+
+// =====カーネル==========================================================
+function goit(i,j)
+	{
+	page=i;line=j;
+	if(top.MAIN&&typeof top.MAIN.runLocation==="function") top.MAIN.runLocation(i,j);
+	}
+function jump() {top.MAIN.line(line);}
+
+// =====画像関連==========================================================
+
+function layer(str,x,y,xs,ys)
+	{
+	gcnt++;
+	lgrp[gcnt] = str;
+	lx[gcnt] = x;
+	ly[gcnt] = y;
+	lxs[gcnt] = xs;
+	lys[gcnt] = ys;
+	drawcnt=0;
+	}
+
+// =====テキスト関連======================================================
+
+function put(str)
+	{
+	tcnt++;
+	ltxt[tcnt] = {type:"text",html:str};
+	}
+function putDialogue(speaker,body,voice)
+	{
+	tcnt++;
+	ltxt[tcnt] = {type:"dialogue",speaker:String(speaker),body:String(body),voice:String(voice||"")};
+	}
+function sel(prompt,jumpto,page)
+	{
+	scnt++;
+	lsel[scnt] = prompt;
+	ls[scnt] = jumpto;
+	ls2[scnt] = page;
+	}
+function drawtext()
+{
+var choices="";
+var action;
+currentTextUnits=[];
+var normalHtml="";
+var normalPresentationStage=null;
+var normalFadeAfter=null;
+function flushNormalUnit()
+	{
+	if(!plainStoryText(normalHtml)){normalHtml="";return;}
+	var unitIndex=currentTextUnits.length;
+	var text=plainStoryText(normalHtml);
+	currentTextUnits.push({type:"text",html:normalHtml,text:text,key:makeMessageKey(text,unitIndex),presentationStage:normalPresentationStage,fadeAfter:normalFadeAfter});
+	normalHtml="";
+	normalPresentationStage=null;
+	normalFadeAfter=null;
+	}
+for (i=1;i<=tcnt;i++)
+	{
+	var entry=ltxt[i];
+	if(typeof entry==="string") normalHtml+=entry;
+	else if(entry&&entry.type==="dialogue")
+		{
+		flushNormalUnit();
+		var dialogueText=entry.speaker+"「"+plainStoryText(entry.body)+"」";
+		var dialogueIndex=currentTextUnits.length;
+		currentTextUnits.push({type:"dialogue",speaker:entry.speaker,body:plainStoryText(entry.body),voice:entry.voice,text:dialogueText,key:makeMessageKey(dialogueText,dialogueIndex),presentationStage:entry.presentationStage||null,fadeAfter:entry.fadeAfter||null});
+		}
+	else if(entry)
+		{
+		if(normalHtml&&normalPresentationStage&&entry.presentationStage&&normalPresentationStage.revision!==entry.presentationStage.revision) flushNormalUnit();
+		if(!normalHtml) normalPresentationStage=entry.presentationStage||null;
+		normalHtml+=entry.html||"";
+		if(entry.fadeAfter){normalFadeAfter=entry.fadeAfter;flushNormalUnit();}
+		}
+	}
+flushNormalUnit();
+currentMessageKey="";currentMessageRead=false;
+for(i=1;i<=9;i++) {selt1[i]=-1;selt2[i]=-1;}
+for (i=1;i<=scnt;i++)
+  {
+  if (ls2[i]==0)
+    {
+    selt1[i]=ls[i];selt2[i]=0;
+    action = "activateChoice("+i+")";
+    }
+  else
+    {
+    selt1[i]=ls[i];selt2[i]=ls2[i];
+    action = "activateChoice("+i+")";
+    }
+    var displayedChoice=typeof top.transformNekomimiText==="function"?top.transformNekomimiText(lsel[i]):lsel[i];
+    choices=choices+"<button type='button' class='story-choice' onClick='"+action+"'><span class='choice-number'>"+i+"</span><span>"+displayedChoice+"</span></button>";
+  }
+var shell="<main class='message-screen'><section class='message-window'><div class='dialogue-nameplate' hidden></div><button type='button' class='message-close-button' aria-label='テキストを非表示' title='テキストを非表示'>×</button><div class='message-viewport'><div class='message-content'></div></div><img class='message-wait-indicator' alt='' aria-hidden='true'></section></main>";
+if (scnt>1) shell+="<main class='choice-screen' hidden><section class='choice-panel'>"+choices+"</section></main>";
+return shell;
+}
+
+// ===== Message history =================================================
+messageHistory=[];
+lastHistorySignature="";
+READ_MESSAGES_KEY="Time2:ReadMessages";
+try{readMessages=new Set(JSON.parse(localStorage.getItem(READ_MESSAGES_KEY)||"[]"));}catch(error){readMessages=new Set();}
+currentMessageKey="";currentMessageRead=false;
+function plainStoryText(html)
+	{
+	var holder=document.createElement("div");
+	holder.innerHTML=html;
+	var breaks=holder.querySelectorAll("br");
+	for(var breakIndex=0;breakIndex<breaks.length;breakIndex++) breaks[breakIndex].replaceWith(document.createTextNode("\n"));
+	var blocks=holder.querySelectorAll("p,div,dl,dt,dd,li,tr,table,hr");
+	for(var blockIndex=0;blockIndex<blocks.length;blockIndex++) blocks[blockIndex].appendChild(document.createTextNode("\n"));
+	return (holder.textContent||"")
+		.replace(/\r/g,"")
+		.replace(/\u3000/g," ")
+		.replace(/[ \t]+\n/g,"\n")
+		.replace(/\n{3,}/g,"\n\n")
+		.replace(/^\n+|\n+$/g,"");
+	}
+function resetMessageHistory()
+	{
+	messageHistory=[];lastHistorySignature="";
+	if(top.closeHistory) top.closeHistory();
+	}
+function recordMessageHistory(unit)
+	{
+	if(!unit) return;
+	var text=unit.text||plainStoryText(unit.html||"");
+	text=text.replace(/\uE000/g,"\n");
+	if(!text) return;
+	var signature=unit.key||page+":"+line+":"+text;
+	if(signature==lastHistorySignature) return;
+	messageHistory.push({type:"message",text:text,key:unit.key||currentMessageKey,voice:unit.type==="dialogue"?(unit.voice||""):""});
+	lastHistorySignature=signature;
+	}
+function recordChoiceHistory(index)
+	{
+	var text=plainStoryText(lsel[index]||"");
+	if(text.replace(/[\s\u3000]/g,"")==="次へ") return;
+	if(text) messageHistory.push({type:"choice",text:text});
+	lastHistorySignature="";
+	}
+function makeMessageKey(content,unitIndex)
+	{
+	var text=plainStoryText(content);var hash=2166136261;
+	for(var hashIndex=0;hashIndex<text.length;hashIndex++)
+		{hash^=text.charCodeAt(hashIndex);hash=Math.imul(hash,16777619);}
+	return page+":"+line+":"+(unitIndex==null?0:unitIndex)+":"+(hash>>>0).toString(36);
+	}
+function isMessageRead(key){return !!key&&readMessages.has(key);}
+function setCurrentMessage(key)
+	{
+	currentMessageKey=key||"";currentMessageRead=isMessageRead(currentMessageKey);
+	return currentMessageRead;
+	}
+function markCurrentMessageRead()
+	{
+	if(!currentMessageKey||readMessages.has(currentMessageKey)) return;
+	readMessages.add(currentMessageKey);currentMessageRead=true;
+	localStorage.setItem(READ_MESSAGES_KEY,JSON.stringify(Array.from(readMessages)));
+	}
+
+// =====BGM関連==========================================================
+function bgm(url){next_bgm=url;}
+
+function chgbgm()
+	{
+	if ((String(url_bgm).replace(/^@/,"")==String(next_bgm).replace(/^@/,""))&&(next_bgm!="")&&typeof top.isBgmActuallyPlaying==="function"&&top.isBgmActuallyPlaying(next_bgm))
+		{
+		return;
+		}
+	if (next_bgm.length<4) { url_bgm="";top.stopBgm();}
+	else	{ url_bgm=next_bgm;
+		if (document.FORM2.C_BGM.checked) top.playBgm(url_bgm);
+			else top.stopBgm();
+		}
+	}
+// =====フラグ関連=======================================================
+function flag_on(num)	{ flg[num]=1; }
+function flag_off(num)	{ flg[num]=0; }
+function flag_rev(num)
+	{
+	if (flg[num]==0)	flg[num]=1;
+		else		flg[num]=0;
+	return(flg[num]);
+	}
+function flag(num)	{ return(flg[num]); }
+function detect(dt_str)
+	{
+	len=dt_str.length;
+	if (len==0)	return(true);
+	result=true;
+	nums="0123456789";
+	str2="";fl1="";fl2=true;var fl4;
+	for(i=0;i<len;i++)
+		{
+		c=dt_str.charAt(i);
+		if (c==' ') continue;
+		if (c=='!') {fl2=false;continue;}
+		ps=nums.indexOf(c,0);
+		if (ps != -1)
+			{
+			fl1=fl1+c;
+			if (i!=len-1) continue;
+			}
+		if (fl1.length > 0)
+			{
+			fl3=parseInt(fl1,10);		
+			if ((fl3<=0)||(fl3>=100))
+				{ top.showGameAlert('シナリオのフラグ指定に誤りがあります。','システムエラー');
+				  result=false;break;
+				}
+			fl4=flg[fl3];
+			if (fl2==false)  fl4=(fl4 ^ 1);
+			str2=str2+ fl4;
+			fl1="";
+			fl2=true;
+			if (c=='*') {str2=str2+"&";}
+			if (c=='+') {str2=str2+"|";}
+			if (i != len-1) continue;
+			}
+		}
+	if (result==true)
+		{
+		res1=eval(str2);
+		if (res1==1) result=true;
+		if (res1==0) result=false;
+		return(result);
+		}
+	else return(false);
+	}
+
+// =====ボタン関連=======================================================
+function change_ck2()
+	{
+	if ((document.FORM2.C_BGM.checked==false)||(url_bgm=="")) top.stopBgm();
+	else {top.unlockAudio().then(function(){top.playBgm(url_bgm);});}
+	}
+function returnToTitle(skipConfirmation)
+	{
+	if(!skipConfirmation){top.requestReturnToTitle();return false;}
+	bgm("");init();clrtxt();drawcnt=0;gcnt=0;
+	top.stopBgm();
+	top.stopVoice();
+	if(typeof top.stopScenarioSounds==="function") top.stopScenarioSounds();
+	top.renderGraphics(drawgrp(),top.imageEffectsEnabled);
+	top.TEXT.location.href=appUrl("textx.html");
+	if(top.MAIN&&typeof top.MAIN.resetScenarioState==="function") top.MAIN.resetScenarioState();
+	top.showTitleScreen();
+	return true;
+	}
+function savenow()
+	{
+	for(i=1;i<=100;i++) wflg[i]=flg[i];
+	wgcnt=gcnt;wscrn=scrn;
+	}
+// =====グラフィック＆テキスト＆選択肢 ==================================
+lgrp=new Array(32);
+lx=new Array(32);
+ly=new Array(32);
+lxs=new Array(32);
+lys=new Array(32);
+gcnt = 0;wgcnt=0;drawcnt = 0;
+
+ltxt = new Array(256);
+lsel = new Array(20);
+ls = new Array(20);
+ls2= new Array(20);
+tcnt = 0;scnt = 0;gameOverPending=false;endingPending=null;screenFadePending=null;deferredFadePending=null;exitPending=false;pendingPresentationStage=null;
+scrn=0;wscrn=-1;
+// =====フラグ===========================================================
+flg = new Array(100);
+wflg= new Array(100);
+// =====その他変数=======================================================
+url_bgm="";next_bgm="";
+page=0;line=0;boot=true;wbgm="";msgskip=false;skipVisualEffect=false;
+// =====システム初期化===================================================
+init();bgm("");
+</script>
+
+</body>
+</html>
